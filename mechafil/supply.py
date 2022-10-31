@@ -24,7 +24,6 @@ def forecast_circulating_supply_df(
     mint_df: pd.DataFrame,
     known_scheduled_pledge_release_vec: np.array,
     lock_target: float = 0.3,
-    use_termination_renewals: bool = False,
 ) -> pd.DataFrame:
     # initialise dataframe and auxilialy variables
     df = initialise_circulating_supply_df(
@@ -60,7 +59,6 @@ def forecast_circulating_supply_df(
             renewal_rate,
             scheduled_pledge_release,
             lock_target,
-            use_termination_renewals,
         )
         # Get total locked pledge (needed for future day_locked_pledge)
         day_locked_pledge = compute_day_locked_pledge(
@@ -73,7 +71,6 @@ def forecast_circulating_supply_df(
             renewal_rate,
             scheduled_pledge_release,
             lock_target,
-            use_termination_renewals,
         )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(

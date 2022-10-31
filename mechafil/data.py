@@ -24,9 +24,9 @@ def get_historical_network_stats(
     stats_df = stats_df.merge(power_df, on="date", how="inner").merge(
         onboards_df, on="date", how="inner"
     )
-    # TODO: Get day_renewed_qa_power_pib from starboard instead of approximating
-    # https://observablehq.com/@starboard/chart-scheduled-expiration-by-date-breakdown-in-qap
-    stats_df["day_renewed_qa_power_pib"] = 0.0
+    stats_df["day_renewed_qa_power_pib"] = get_day_renewed_qa_power_stats(
+        start_date, current_date, end_date
+    )
     return stats_df
 
 
@@ -34,33 +34,56 @@ def get_sector_expiration_stats(
     start_date: datetime.date,
     current_date: datetime.date,
     end_date: datetime.date,
-    fil_plus_rate: float,
 ):
     scheduled_df = query_starboard_sector_expirations(start_date, end_date)
-    rbp_expire_vec = scheduled_df[
+    filter_scheduled_df = scheduled_df[
         scheduled_df["date"] >= pd.to_datetime(current_date, utc="UTC")
-    ]["total_rb"].values
-    # TODO: Query real data instead of approximate
-    # https://observablehq.com/@starboard/chart-scheduled-expiration-by-date-breakdown-in-qap
-    qap_expire_vec = (1 + 9 * fil_plus_rate) * rbp_expire_vec
-    pledge_release_vec = scheduled_df["total_pledge"].values
+    ]
+    rbp_expire_vec = filter_scheduled_df["total_rb"].values
+    qap_expire_vec = filter_scheduled_df["total_qa"].values
+    pledge_release_vec = filter_scheduled_df["total_pledge"].values
     return rbp_expire_vec, qap_expire_vec, pledge_release_vec
+
+
+def get_day_renewed_qa_power_stats(
+    start_date: datetime.date,
+    current_date: datetime.date,
+    end_date: datetime.date,
+) -> np.array:
+    scheduled_df = query_starboard_sector_expirations(start_date, end_date)
+    filter_scheduled_df = scheduled_df[
+        scheduled_df["date"] < pd.to_datetime(current_date, utc="UTC")
+    ]
+    day_renewed_qa_power = filter_scheduled_df["extended_qa"].values
+    return day_renewed_qa_power
 
 
 def query_starboard_sector_expirations(
     start_date: datetime.date, end_date: datetime.date
 ) -> pd.DataFrame:
-    url = f"https://observable-api.starboard.ventures/getdata/sectors_schedule_expiration_full?start={str(start_date)}&end={str(end_date)}"
+    url = f"https://observable-api-test.starboard.ventures/getdata/sectors_schedule_expiration_full?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
     # Put data in dataframe
     scheduled_df = pd.DataFrame(r.json()["data"])
-    # Convert bytes to petabytes
-    scheduled_df["extended"] = scheduled_df["extended_bytes"].astype(float) / PIB
-    scheduled_df["expired"] = scheduled_df["expired_bytes"].astype(float) / PIB
-    scheduled_df["open"] = scheduled_df["potential_expire_bytes"].astype(float) / PIB
+    # Convert bytes to pebibytes
+    scheduled_df["extended_rb"] = scheduled_df["extended_bytes"].astype(float) / PIB
+    scheduled_df["expired_rb"] = scheduled_df["expired_bytes"].astype(float) / PIB
+    scheduled_df["open_rb"] = scheduled_df["potential_expire_bytes"].astype(float) / PIB
+    scheduled_df["extended_qa"] = scheduled_df["extended_bytes_qap"].astype(float) / PIB
+    scheduled_df["expired_qa"] = scheduled_df["expired_bytes_qap"].astype(float) / PIB
+    scheduled_df["open_qa"] = (
+        scheduled_df["potential_expire_bytes_qap"].astype(float) / PIB
+    )
     # Total scheduled to expire, excluding terminated
     scheduled_df["total_rb"] = (
-        scheduled_df["extended"] + scheduled_df["expired"] + scheduled_df["open"]
+        scheduled_df["extended_rb"]
+        + scheduled_df["expired_rb"]
+        + scheduled_df["open_rb"]
+    )
+    scheduled_df["total_qa"] = (
+        scheduled_df["extended_qa"]
+        + scheduled_df["expired_qa"]
+        + scheduled_df["open_qa"]
     )
     scheduled_df["total_pledge"] = (
         scheduled_df["extended_pledge"].astype(float)
