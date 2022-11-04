@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import datetime
 
 from .locking import (
     get_day_schedule_pledge_release,
@@ -109,18 +110,22 @@ def forecast_circulating_supply_df(
 
 
 def initialise_circulating_supply_df(
-    start_day: int,
-    end_day: int,
+    start_date: datetime.date,
+    end_date: datetime.date,
     circ_supply_zero: float,
     locked_fil_zero: float,
     burnt_fil_vec: np.array,
     vest_df: pd.DataFrame,
     mint_df: pd.DataFrame,
 ) -> pd.DataFrame:
+    # we assume days start at main net launch, in 2020-10-15
+    start_day = (start_date - datetime.date(2020, 10, 15)).days
+    end_day = (end_date - datetime.date(2020, 10, 15)).days
     len_sim = end_day - start_day
     df = pd.DataFrame(
         {
             "days": np.arange(start_day, end_day),
+            "date": pd.date_range(start_date, end_date, freq="d"),
             "circ_supply": np.zeros(len_sim),
             "network_gas_burn": np.pad(
                 burnt_fil_vec, (0, len_sim - len(burnt_fil_vec))
@@ -137,6 +142,6 @@ def initialise_circulating_supply_df(
     df["network_locked_reward"].iloc[0] = locked_fil_zero / 2.0
     df["network_locked"].iloc[0] = locked_fil_zero
     df["circ_supply"].iloc[0] = circ_supply_zero
-    df = df.merge(vest_df, on="days", how="inner")
-    df = df.merge(mint_df, on="days", how="inner")
+    df = df.merge(vest_df, on="date", how="inner")
+    df = df.merge(mint_df, on="date", how="inner")
     return df
