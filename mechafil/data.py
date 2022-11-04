@@ -61,7 +61,7 @@ def get_day_renewed_qa_power_stats(
 def query_starboard_sector_expirations(
     start_date: datetime.date, end_date: datetime.date
 ) -> pd.DataFrame:
-    url = f"https://observable-api-test.starboard.ventures/getdata/sectors_schedule_expiration_full?start={str(start_date)}&end={str(end_date)}"
+    url = f"https://observable-api.starboard.ventures/getdata/sectors_schedule_expiration_full?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
     # Put data in dataframe
     scheduled_df = pd.DataFrame(r.json()["data"])
@@ -108,7 +108,7 @@ def query_starboard_daily_power_onboarded(
     end_date: datetime.date,
 ):
     # Get data from prove-commit-split-d API
-    url = f"https://observable-api-test.starboard.ventures/api/v1/observable/prove-commit-split-d-v2?start={str(start_date)}&end={str(end_date)}"
+    url = f"https://observable-api.starboard.ventures/api/v1/observable/prove-commit-split-d-v2?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
     onboards_df = pd.DataFrame(r.json()["data"])
     # Compute total onboardings
@@ -182,3 +182,17 @@ def query_starboard_power_stats(
     # Select final columns
     power_df = power_df[["date", "total_raw_power_eib", "total_qa_power_eib"]]
     return power_df
+
+
+def get_storage_baseline_value(start_date: datetime.date):
+    # Get last beaseline value from Starboard API
+    url = f"https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power"
+    r = requests.get(url)
+    temp_df = pd.DataFrame(r.json()["data"])
+    temp_df["date"] = pd.to_datetime(temp_df["stat_date"])
+    # Extract baseline value at start_date
+    init_baseline_bytes = int(
+        temp_df[temp_df["date"] >= pd.to_datetime(start_date, utc="UTC")].iloc[0, 1]
+    )
+    init_baseline = init_baseline_bytes / EXBI
+    return init_baseline
