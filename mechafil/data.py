@@ -184,15 +184,44 @@ def query_starboard_power_stats(
     return power_df
 
 
-def get_storage_baseline_value(start_date: datetime.date):
-    # Get last beaseline value from Starboard API
+def get_storage_baseline_value(date: datetime.date) -> float:
+    # Get baseline values from Starboard API
+    bp_df = query_historical_baseline_power()
+    # Extract baseline value at date
+    init_baseline_bytes = bp_df[bp_df["date"] >= pd.to_datetime(date, utc="UTC")].iloc[
+        0, 1
+    ]
+    return init_baseline_bytes
+
+
+def get_cum_capped_rb_power(date: datetime.date):
+    # Query data sources and join
+    rbp_df = query_historical_rb_power()
+    bp_df = query_historical_baseline_power()
+    df = pd.merge(rbp_df, bp_df, on="date", how="inner")
+    # Compute cumulative capped RB power
+    df["capped_power"] = np.min(df[["baseline", "rb_power"]].values, axis=1)
+    df["cum_capped_power"] = df["capped_power"].cumsum()
+    date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
+    init_cum_capped_power = date_df["cum_capped_power"].iloc[0]
+    return init_cum_capped_power
+
+
+def query_historical_baseline_power() -> pd.DataFrame:
     url = f"https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power"
     r = requests.get(url)
-    temp_df = pd.DataFrame(r.json()["data"])
-    temp_df["date"] = pd.to_datetime(temp_df["stat_date"])
-    # Extract baseline value at start_date
-    init_baseline_bytes = int(
-        temp_df[temp_df["date"] >= pd.to_datetime(start_date, utc="UTC")].iloc[0, 1]
-    )
-    init_baseline = init_baseline_bytes / EXBI
-    return init_baseline
+    bp_df = pd.DataFrame(r.json()["data"])
+    bp_df["date"] = pd.to_datetime(bp_df["stat_date"])
+    bp_df["baseline"] = bp_df["new_baseline_power"].astype(float)
+    bp_df = bp_df[["date", "baseline"]]
+    return bp_df
+
+
+def query_historical_rb_power() -> pd.DataFrame:
+    url = f"https://observable-api.starboard.ventures/network_storage_capacity/total_raw_bytes_power"
+    r = requests.get(url)
+    rbp_df = pd.DataFrame(r.json()["data"])
+    rbp_df["date"] = pd.to_datetime(rbp_df["stat_date"])
+    rbp_df["rb_power"] = rbp_df["total_raw_bytes_power"].astype(float)
+    rbp_df = rbp_df[["date", "rb_power"]]
+    return rbp_df

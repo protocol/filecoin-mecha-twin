@@ -1,59 +1,61 @@
+import datetime
 import numpy as np
 import pandas as pd
 
+from .data import get_storage_baseline_value, get_cum_capped_rb_power
+
 EXBI = 2**60
 PIB = 2**50
-EPOCH_PER_DAY = 2880
 LAMBDA = np.log(2) / (
-    6.0 * 365 * EPOCH_PER_DAY
-)  # 30s epoch minting exponential reward decay rate
-SIMPLE_ALLOC = 0.3 * 1.1 * 10**9  # total simple minting allocation
-BASELINE_ALLOC = 0.7 * 1.1 * 10**9  # total baseline minting allocation
-BASELINE_B0 = 2.88888888 * EXBI  # initial storage
-BASELINE_R = np.log(2) / (2880 * 365)  # 1_051_200 in epochs
+    6.0 * 365
+)  # minting exponential reward decay rate (6yrs half-life)
+FIL_BASE = 2_000_000_000.0
+STORAGE_MINING = 0.55 * FIL_BASE
+SIMPLE_ALLOC = 0.3 * STORAGE_MINING  # total simple minting allocation
+BASELINE_ALLOC = 0.7 * STORAGE_MINING  # total baseline minting allocation
+GROWTH_RATE = float(
+    np.log(2) / 365.0
+)  # daily baseline growth rate (the "g" from https://spec.filecoin.io/#section-systems.filecoin_token)
+BASELINE_STORAGE = (
+    2.88888888 * EXBI
+)  # the b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
 
 
 def compute_minting_trajectory_df(
-    start_day: int,
-    end_day: int,
-    cum_capped_power_zero: float,
+    start_date: datetime.date,
+    end_date: datetime.date,
     rb_total_power_eib: np.array,
     qa_total_power_eib: np.array,
     qa_day_onboarded_power_pib: np.array,
     qa_day_renewed_power_pib: np.array,
 ) -> pd.DataFrame:
-    start_epoch = start_day * EPOCH_PER_DAY
-    end_epoch = end_day * EPOCH_PER_DAY
+    # we assume minting started at main net launch, in 2020-10-15
+    start_day = (start_date - datetime.date(2020, 10, 15)).days
+    end_day = (end_date - datetime.date(2020, 10, 15)).days
+    # Init dataframe
     df = pd.DataFrame(
         {
             "days": np.arange(start_day, end_day),
-            "epoch": np.arange(start_epoch, end_epoch, EPOCH_PER_DAY),
+            "date": pd.date_range(start_date, end_date, freq="d")[:-1],
             "network_RBP": rb_total_power_eib * EXBI,
             "network_QAP": qa_total_power_eib * EXBI,
             "day_onboarded_power_QAP": qa_day_onboarded_power_pib * PIB,
             "day_renewed_power_QAP": qa_day_renewed_power_pib * PIB,
         }
     )
-    df.loc[:, "simple_reward_epoch"] = df["epoch"].pipe(simple_reward_epoch)
-    df.loc[:, "network_baseline"] = df["epoch"].pipe(baseline_storage)
-    df.loc[:, "capped_power"] = np.min(
-        df[["network_baseline", "network_RBP"]].values, axis=1
-    )
-    cum_capped_power_zero_vec = np.ones(len(df)) * cum_capped_power_zero
-    df.loc[:, "cum_capped_power"] = (
-        cum_capped_power_zero_vec + EPOCH_PER_DAY * df["capped_power"].cumsum().values
-    )
-    df.loc[:, "cum_simple_reward"] = df["epoch"].pipe(cum_simple_reward)
-    df.loc[:, "network_time"] = df["cum_capped_power"].pipe(network_time)
-    df.loc[:, "cum_baseline_reward"] = df["network_time"].pipe(
-        cum_baseline_reward_epoch
-    )
-    df.loc[:, "cum_network_reward"] = (
-        df["cum_baseline_reward"] + df["cum_simple_reward"]
-    )
-    df.loc[:, "day_network_reward"] = (
-        df["cum_network_reward"].diff().fillna(method="backfill")
-    )
+    # Compute cumulative rewards due to simple minting
+    df["cum_simple_reward"] = df["days"].pipe(cum_simple_minting)
+    # Compute cumulative rewards due to baseline minting
+    df["network_baseline"] = compute_baseline_power_array(start_date, end_date)
+    df["capped_power"] = np.min(df[["network_baseline", "network_RBP"]].values, axis=1)
+    zero_cum_capped_power = get_cum_capped_rb_power(start_date)
+    df["cum_capped_power"] = df["capped_power"].cumsum() + zero_cum_capped_power
+    df["network_time"] = df["cum_capped_power"].pipe(network_time)
+    df["cum_baseline_reward"] = df["network_time"].pipe(cum_baseline_reward)
+    # Add cumulative rewards and get daily rewards minted
+    df["cum_network_reward"] = df["cum_baseline_reward"] + df["cum_simple_reward"]
+    df["day_network_reward"] = df["cum_network_reward"].diff().fillna(method="backfill")
+    # Derive QAP and RBP growth variables
     df["network_QAP_growth"] = df["network_QAP"].diff().fillna(method="backfill")
     df["network_RBP_growth"] = df["network_RBP"].diff().fillna(method="backfill")
     df["network_QAP_percentgrowth_day"] = df["network_QAP_growth"] / df["network_QAP"]
@@ -61,44 +63,27 @@ def compute_minting_trajectory_df(
     return df
 
 
-def simple_reward_epoch(epoch: float) -> float:
+def cum_simple_minting(day: int) -> float:
     """
-    Exponential decay simple reward
+    Simple minting - the total number of tokens that should have been emitted
+    by simple minting up until date provided.
     """
-    return SIMPLE_ALLOC * LAMBDA * np.exp(-LAMBDA * epoch)
+    return SIMPLE_ALLOC * (1 - np.exp(-LAMBDA * day))
 
 
-def baseline_storage(epoch: float) -> float:
-    """
-    Baseline storage target function
-    epoch -- time in 30s second epochs since first mint
-
-    """
-    return BASELINE_B0 * np.exp(BASELINE_R * epoch)
-
-
-def baseline_reward(capped_power: np.array, cum_capped_power: np.array) -> np.array:
-    """
-    Derivative of cum_baseline_reward_epoch
-    """
-    a = BASELINE_ALLOC * LAMBDA / BASELINE_B0
-    b = capped_power
-    c = (1 + (BASELINE_R / BASELINE_B0) * cum_capped_power) ** (1 + LAMBDA / BASELINE_R)
-    return a * b / c
+def compute_baseline_power_array(start_date: datetime.date, end_date: datetime.date):
+    arr_len = (end_date - start_date).days
+    exponents = np.arange(0, arr_len)
+    init_baseline = get_storage_baseline_value(start_date)
+    baseline_power_arr = init_baseline * np.exp(GROWTH_RATE * exponents)
+    return baseline_power_arr
 
 
-def cum_simple_reward(epoch):
-    """
-    Cumulative exponential decay simple reward
-    """
-    return SIMPLE_ALLOC * (1 - np.exp(-LAMBDA * epoch))
+def network_time(cum_capped_power: float) -> float:
+    b0 = BASELINE_STORAGE
+    g = GROWTH_RATE
+    return (1 / g) * np.log(((g * cum_capped_power) / b0) + 1)
 
 
-def network_time(cum_capped_power):
-    """ """
-    return np.log1p(BASELINE_R * cum_capped_power / BASELINE_B0) / BASELINE_R
-
-
-def cum_baseline_reward_epoch(network_time):
-    """ """
+def cum_baseline_reward(network_time: float) -> float:
     return BASELINE_ALLOC * (1 - np.exp(-LAMBDA * network_time))
