@@ -12,9 +12,9 @@ from .locking import (
 
 
 def forecast_circulating_supply_df(
-    start_day: int,
-    end_day: int,
-    current_day: int,
+    start_date: datetime.date,
+    current_date: datetime.date,
+    end_date: datetime.date,
     circ_supply_zero: float,
     locked_fil_zero: float,
     daily_burnt_fil: float,
@@ -26,10 +26,14 @@ def forecast_circulating_supply_df(
     known_scheduled_pledge_release_vec: np.array,
     lock_target: float = 0.3,
 ) -> pd.DataFrame:
+    # we assume all stats started at main net launch, in 2020-10-15
+    start_day = (start_date - datetime.date(2020, 10, 15)).days
+    current_day = (current_date - datetime.date(2020, 10, 15)).days
+    end_day = (end_date - datetime.date(2020, 10, 15)).days
     # initialise dataframe and auxilialy variables
     df = initialise_circulating_supply_df(
-        start_day,
-        end_day,
+        start_date,
+        end_date,
         circ_supply_zero,
         locked_fil_zero,
         burnt_fil_vec,
@@ -125,7 +129,7 @@ def initialise_circulating_supply_df(
     df = pd.DataFrame(
         {
             "days": np.arange(start_day, end_day),
-            "date": pd.date_range(start_date, end_date, freq="d"),
+            "date": pd.date_range(start_date, end_date, freq="d")[:-1],
             "circ_supply": np.zeros(len_sim),
             "network_gas_burn": np.pad(
                 burnt_fil_vec, (0, len_sim - len(burnt_fil_vec))
