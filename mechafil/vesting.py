@@ -27,7 +27,7 @@ def compute_vesting_trajectory_df(start_date: datetime.date, end_date: datetime.
         - https://coinlist.co/assets/index/filecoin_2017_index/Filecoin-Sale-Economics-e3f703f8cd5f644aecd7ae3860ce932064ce014dd60de115d67ff1e9047ffa8e.pdf
         - https://spec.filecoin.io/#section-systems.filecoin_token.token_allocation
         - https://filecoin.io/blog/filecoin-circulating-supply/
-        - https://github.com/filecoin-project/lotus/blob/e65fae28de2a44947dd24af8c7dafcade29af1a4/chain/stmgr/supply.go#L341
+        - https://github.com/filecoin-project/lotus/blob/e65fae28de2a44947dd24af8c7dafcade29af1a4/chain/stmgr/supply.go#L148
     """
     # we assume vesting started at main net launch, in 2020-10-15
     launch_date = datetime.date(2020, 10, 15)
