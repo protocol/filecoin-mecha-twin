@@ -17,8 +17,12 @@ GROWTH_RATE = float(
     np.log(2) / 365.0
 )  # daily baseline growth rate (the "g" from https://spec.filecoin.io/#section-systems.filecoin_token)
 BASELINE_STORAGE = (
-    2.88888888 * EXBI
-)  # the b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
+    2.88888888
+    * EXBI
+    # the b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
+)
+# TODO: understand why the baseline value from startboard differs from the spec!
+# 3189227188947034973 from https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power
 
 
 def compute_minting_trajectory_df(
@@ -56,11 +60,6 @@ def compute_minting_trajectory_df(
     # Add cumulative rewards and get daily rewards minted
     df["cum_network_reward"] = df["cum_baseline_reward"] + df["cum_simple_reward"]
     df["day_network_reward"] = df["cum_network_reward"].diff().fillna(method="backfill")
-    # Derive QAP and RBP growth variables
-    df["network_QAP_growth"] = df["network_QAP"].diff().fillna(method="backfill")
-    df["network_RBP_growth"] = df["network_RBP"].diff().fillna(method="backfill")
-    df["network_QAP_percentgrowth_day"] = df["network_QAP_growth"] / df["network_QAP"]
-    df["network_RBP_percentgrowth_day"] = df["network_RBP_growth"] / df["network_RBP"]
     return df
 
 
