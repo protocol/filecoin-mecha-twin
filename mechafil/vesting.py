@@ -15,13 +15,14 @@ def compute_vesting_trajectory_df(start_date: datetime.date, end_date: datetime.
     """
     15% to PL -> 6-year linear vesting
     5% to FIlecoin foundation -> 6-year linear vesting
-    10% to Investors -> 6-month to 3-year linear vesting (taken from lotus):
-        - 3 yrs: 87637883 + 898958
-        - 2 yrs: 7223364
-        - 1 yrs: 9400000 + 22421712
-        - 6 months: 19015887 + 32787700
-        - 0 months: 10632000
-        (total of 190_017_504)
+    10% to Investors -> Linear vesting with different durations (taken from lotus):
+        - 0 days: 10_632_000
+        - 6 months: 19_015_887 + 32_787_700
+        - 1 yrs: 22_421_712 + 9_400_000
+        - 2 yrs: 7_223_364
+        - 3 yrs: 87_637_883 + 898_958
+        - 6 yrs: 9_805_053
+        (total of 199_822_557)
 
     Info taken from:
         - https://coinlist.co/assets/index/filecoin_2017_index/Filecoin-Sale-Economics-e3f703f8cd5f644aecd7ae3860ce932064ce014dd60de115d67ff1e9047ffa8e.pdf
@@ -36,10 +37,11 @@ def compute_vesting_trajectory_df(start_date: datetime.date, end_date: datetime.
     full_vest_df = pd.DataFrame(
         {
             "date": pd.date_range(launch_date, end_date, freq="d")[:-1],
-            "six_month_vest_saft": vest(19015887 + 32787700, 183, end_day),
-            "one_year_vest_saft": vest(9400000 + 22421712, 365 * 1, end_day),
-            "two_year_vest_saft": vest(7223364, 365 * 2, end_day),
-            "three_year_vest_saft": vest(87637883 + 898958, 365 * 3, end_day),
+            "six_month_vest_saft": vest(19_015_887 + 32_787_700, 183, end_day),
+            "one_year_vest_saft": vest(22_421_712 + 9_400_000, 365 * 1, end_day),
+            "two_year_vest_saft": vest(7_223_364, 365 * 2, end_day),
+            "three_year_vest_saft": vest(87_637_883 + 898_958, 365 * 3, end_day),
+            "six_year_vest_saft": vest(9_805_053, 365 * 6, end_day),
             "six_year_vest_pl": vest(PL_AMOUNT, 365 * 6, end_day),
             "six_year_vest_foundation": vest(FOUNDATION_AMOUNT, 365 * 6, end_day),
         }
