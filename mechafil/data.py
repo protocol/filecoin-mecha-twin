@@ -10,17 +10,9 @@ PIB = 2**50
 def get_historical_network_stats(
     start_date: datetime.date, current_date: datetime.date, end_date: datetime.date
 ):
-    power_df = query_starboard_power_stats(
-        start_date,
-        current_date,
-        end_date,
-    )
-    onboards_df = query_starboard_daily_power_onboarded(
-        start_date,
-        current_date,
-        end_date,
-    )
-    stats_df = query_starboard_supply_stats(start_date, current_date, end_date)
+    power_df = query_starboard_power_stats(start_date, current_date)
+    onboards_df = query_starboard_daily_power_onboarded(start_date, current_date)
+    stats_df = query_starboard_supply_stats(start_date, current_date)
     stats_df = stats_df.merge(power_df, on="date", how="inner").merge(
         onboards_df, on="date", how="inner"
     )
@@ -104,7 +96,6 @@ def query_starboard_sector_expirations(
 
 def query_starboard_daily_power_onboarded(
     start_date: datetime.date,
-    current_date: datetime.date,
     end_date: datetime.date,
 ):
     # Get data from prove-commit-split-d API
@@ -124,7 +115,7 @@ def query_starboard_daily_power_onboarded(
     onboards_df["date"] = pd.to_datetime(onboards_df["stat_date"]).dt.date
     # Filter dates
     onboards_df = onboards_df[
-        (onboards_df["date"] >= start_date) & (onboards_df["date"] <= current_date)
+        (onboards_df["date"] >= start_date) & (onboards_df["date"] <= end_date)
     ]
     # Filter columns
     onboards_df = onboards_df[
@@ -135,7 +126,6 @@ def query_starboard_daily_power_onboarded(
 
 def query_starboard_supply_stats(
     start_date: datetime.date,
-    current_date: datetime.date,
     end_date: datetime.date,
 ):
     url = f"https://observable-api.starboard.ventures/api/v1/observable/circulating-supply?start={str(start_date)}&end={str(end_date)}"
@@ -155,14 +145,12 @@ def query_starboard_supply_stats(
     stats_df["date"] = pd.to_datetime(raw_stats_df["stat_date"]).dt.date
     # Filter dates
     stats_df = stats_df[
-        (stats_df["date"] >= start_date) & (stats_df["date"] <= current_date)
+        (stats_df["date"] >= start_date) & (stats_df["date"] <= end_date)
     ]
     return stats_df
 
 
-def query_starboard_power_stats(
-    start_date: datetime.date, current_date: datetime.date, end_date: datetime.date
-):
+def query_starboard_power_stats(start_date: datetime.date, end_date: datetime.date):
     url = f"https://observable-api.starboard.ventures/network_storage_capacity?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
     power_df = pd.DataFrame(r.json()["data"])
@@ -170,7 +158,7 @@ def query_starboard_power_stats(
     power_df["date"] = pd.to_datetime(power_df["stat_date"]).dt.date
     # Filter dates
     power_df = power_df[
-        (power_df["date"] >= start_date) & (power_df["date"] <= current_date)
+        (power_df["date"] >= start_date) & (power_df["date"] <= end_date)
     ]
     # Convert power stats to exibytes
     power_df["total_raw_power_eib"] = (
@@ -205,6 +193,14 @@ def get_cum_capped_rb_power(date: datetime.date):
     date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
     init_cum_capped_power = date_df["cum_capped_power"].iloc[0]
     return init_cum_capped_power
+
+
+def get_vested_amount(date: datetime.date):
+    start_date = date - datetime.timedelta(days=1)
+    end_date = date + datetime.timedelta(days=1)
+    stats_df = query_starboard_supply_stats(start_date, end_date)
+    date_stats = stats_df[stats_df["date"] == date]
+    return date_stats["vested_fil"].iloc[0]
 
 
 def query_historical_baseline_power() -> pd.DataFrame:
