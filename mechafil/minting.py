@@ -43,6 +43,7 @@ def compute_minting_trajectory_df(
             "day_renewed_power_QAP": qa_day_renewed_power_pib * PIB,
         }
     )
+    df["date"] = df["date"].dt.date
     # Compute cumulative rewards due to simple minting
     df["cum_simple_reward"] = df["days"].pipe(cum_simple_minting)
     # Compute cumulative rewards due to baseline minting

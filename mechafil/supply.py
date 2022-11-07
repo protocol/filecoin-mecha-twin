@@ -142,6 +142,7 @@ def initialise_circulating_supply_df(
             * (17066618961773411890063046 * 10**-18),
         }
     )
+    df["date"] = df["date"].dt.date
     df["network_locked_pledge"].iloc[0] = locked_fil_zero / 2.0
     df["network_locked_reward"].iloc[0] = locked_fil_zero / 2.0
     df["network_locked"].iloc[0] = locked_fil_zero
