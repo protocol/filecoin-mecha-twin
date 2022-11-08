@@ -80,7 +80,8 @@ def compute_baseline_power_array(start_date: datetime.date, end_date: datetime.d
 
 
 def network_time(cum_capped_power: float) -> float:
-    b0 = BASELINE_STORAGE
+    EXA_TO_EIB = (10**18) / (2**60)
+    b0 = BASELINE_STORAGE * EXA_TO_EIB
     g = GROWTH_RATE
     return (1 / g) * np.log(((g * cum_capped_power) / b0) + 1)
 
