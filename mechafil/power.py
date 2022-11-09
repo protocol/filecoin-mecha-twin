@@ -50,16 +50,16 @@ def forecast_qa_daily_onboardings(
 def compute_day_rb_renewed_power(
     day_i: int,
     day_scheduled_expire_power_vec: np.array,
-    renewal_rate: float,
+    renewal_rate_vec: np.array,
 ):
-    day_renewed_power = renewal_rate * day_scheduled_expire_power_vec[day_i]
+    day_renewed_power = renewal_rate_vec[-1:] * day_scheduled_expire_power_vec[day_i]
     return day_renewed_power
 
 
 def compute_day_qa_renewed_power(
     day_i: int,
     day_rb_scheduled_expire_power_vec: np.array,
-    renewal_rate: float,
+    renewal_rate_vec: np.array,
     fil_plus_rate: float,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
@@ -67,7 +67,7 @@ def compute_day_qa_renewed_power(
 ):
     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
     day_renewed_power = (
-        qa_factor * renewal_rate * day_rb_scheduled_expire_power_vec[day_i]
+        qa_factor * renewal_rate_vec[-1:] * day_rb_scheduled_expire_power_vec[day_i]
     )
     return day_renewed_power
 
@@ -108,7 +108,7 @@ def forecast_power_stats(
     rb_onboard_power: float,
     rb_known_scheduled_expire_vec: np.array,
     qa_known_scheduled_expire_vec: np.array,
-    renewal_rate: float,
+    renewal_rate_vec: np.array,
     fil_plus_rate: float,
     duration: int,
     forecast_lenght: int,
@@ -145,7 +145,7 @@ def forecast_power_stats(
             duration,
         )
         day_rb_renewed_power[day_i] = compute_day_rb_renewed_power(
-            day_i, day_rb_scheduled_expire_power, renewal_rate
+            day_i, day_rb_scheduled_expire_power, renewal_rate_vec
         )
         # Quality-adjusted stats
         day_qa_scheduled_expire_power[day_i] = compute_day_se_power(
@@ -158,7 +158,7 @@ def forecast_power_stats(
         day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
             day_i,
             day_rb_scheduled_expire_power,
-            renewal_rate,
+            renewal_rate_vec[-1:],
             fil_plus_rate,
             fil_plus_m,
             duration_m,

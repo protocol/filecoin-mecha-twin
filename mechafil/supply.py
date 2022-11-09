@@ -19,7 +19,7 @@ def forecast_circulating_supply_df(
     locked_fil_zero: float,
     daily_burnt_fil: float,
     duration: int,
-    renewal_rate: float,
+    renewal_rate_vec: np.array,
     burnt_fil_vec: np.array,
     vest_df: pd.DataFrame,
     mint_df: pd.DataFrame,
@@ -61,7 +61,7 @@ def forecast_circulating_supply_df(
             df["day_renewed_power_QAP"][day_idx],
             df["network_QAP"][day_idx],
             df["network_baseline"][day_idx],
-            renewal_rate,
+            renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target,
         )
@@ -73,7 +73,7 @@ def forecast_circulating_supply_df(
             df["day_renewed_power_QAP"][day_idx],
             df["network_QAP"][day_idx],
             df["network_baseline"][day_idx],
-            renewal_rate,
+            renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target,
         )
