@@ -1,13 +1,13 @@
 import numpy as np
 import pandas as pd
 import datetime
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Union
 
 # --------------------------------------------------------------------------------------
 #  QA Multiplier functions
 # --------------------------------------------------------------------------------------
 def compute_qa_factor(
-    fil_plus_rate: float,
+    fil_plus_rate: Union[np.array, float],
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
     duration: int = None,
@@ -30,8 +30,8 @@ def forecast_rb_daily_onboardings(
 
 
 def forecast_qa_daily_onboardings(
-    rb_onboard_power: float,
-    fil_plus_rate: float,
+    rb_onboard_power: Union[np.array, float],
+    fil_plus_rate: Union[np.array, float],
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
@@ -40,7 +40,10 @@ def forecast_qa_daily_onboardings(
     # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
     qa_onboard_power = qa_factor * rb_onboard_power
-    qa_onboarded_power_vec = np.ones(forecast_lenght) * qa_onboard_power
+    if isinstance(rb_onboard_power, float):
+        qa_onboarded_power_vec = np.ones(forecast_lenght) * qa_onboard_power
+    else:
+        qa_onboarded_power_vec = qa_onboard_power
     return qa_onboarded_power_vec
 
 
@@ -52,7 +55,8 @@ def compute_day_rb_renewed_power(
     day_scheduled_expire_power_vec: np.array,
     renewal_rate_vec: np.array,
 ):
-    day_renewed_power = renewal_rate_vec[-1:] * day_scheduled_expire_power_vec[day_i]
+    #day_renewed_power = renewal_rate_vec[-1:] * day_scheduled_expire_power_vec[day_i]
+    day_renewed_power = renewal_rate_vec[day_i] * day_scheduled_expire_power_vec[day_i]
     return day_renewed_power
 
 
@@ -66,8 +70,11 @@ def compute_day_qa_renewed_power(
     duration: int = None,
 ):
     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
+    # day_renewed_power = (
+    #     qa_factor * renewal_rate_vec[-1:] * day_rb_scheduled_expire_power_vec[day_i]
+    # )
     day_renewed_power = (
-        qa_factor * renewal_rate_vec[-1:] * day_rb_scheduled_expire_power_vec[day_i]
+        qa_factor * renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
     )
     return day_renewed_power
 
@@ -105,20 +112,33 @@ def compute_day_se_power(
 def forecast_power_stats(
     rb_power_zero: float,
     qa_power_zero: float,
-    rb_onboard_power: float,
+    rb_onboard_power: Union[np.array, float],
     rb_known_scheduled_expire_vec: np.array,
     qa_known_scheduled_expire_vec: np.array,
-    renewal_rate_vec: np.array,
-    fil_plus_rate: float,
+    renewal_rate: Union[np.array, float],
+    fil_plus_rate: Union[np.array, float],
     duration: int,
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Forecast onboards
-    day_rb_onboarded_power = forecast_rb_daily_onboardings(
-        rb_onboard_power, forecast_lenght
-    )
+    if isinstance(renewal_rate, float):
+        renewal_rate_vec = np.ones(forecast_lenght) * renewal_rate
+    else:
+        assert len(renewal_rate) == forecast_lenght, \
+            "if renewal_rate is provided as a vector, it must be the same length as the forecast length"
+        renewal_rate_vec = renewal_rate
+
+    if isinstance(rb_onboard_power, float):
+        day_rb_onboarded_power = forecast_rb_daily_onboardings(
+            rb_onboard_power, forecast_lenght
+        )
+    else:
+        assert len(rb_onboard_power) == forecast_lenght, \
+            "if rb_onboard_power is provided as a vector, it must be the same length as the forecast length"
+        day_rb_onboarded_power = rb_onboard_power
+
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
         rb_onboard_power,
@@ -155,11 +175,13 @@ def forecast_power_stats(
             day_qa_renewed_power,
             duration,
         )
+        fpr = fil_plus_rate if isinstance(fil_plus_rate, float) else fil_plus_rate[day_i]
         day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
             day_i,
             day_rb_scheduled_expire_power,
-            renewal_rate_vec[-1:],
-            fil_plus_rate,
+            # renewal_rate_vec[-1:],
+            renewal_rate_vec,
+            fpr,
             fil_plus_m,
             duration_m,
             duration,
