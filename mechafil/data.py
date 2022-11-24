@@ -197,6 +197,19 @@ def get_cum_capped_rb_power(date: datetime.date):
     return init_cum_capped_power
 
 
+def get_cum_capped_qa_power(date: datetime.date):
+    # Query data sources and join
+    qap_df = query_historical_qa_power()
+    bp_df = query_historical_baseline_power()
+    df = pd.merge(qap_df, bp_df, on="date", how="inner")
+    # Compute cumulative capped RB power
+    df["capped_power"] = np.min(df[["baseline", "qa_power"]].values, axis=1)
+    df["cum_capped_power"] = df["capped_power"].cumsum()
+    date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
+    init_cum_capped_power = date_df["cum_capped_power"].iloc[0]
+    return init_cum_capped_power
+
+
 def get_vested_amount(date: datetime.date):
     start_date = date - datetime.timedelta(days=1)
     end_date = date + datetime.timedelta(days=1)
@@ -223,3 +236,12 @@ def query_historical_rb_power() -> pd.DataFrame:
     rbp_df["rb_power"] = rbp_df["total_raw_bytes_power"].astype(float)
     rbp_df = rbp_df[["date", "rb_power"]]
     return rbp_df
+
+def query_historical_qa_power() -> pd.DataFrame:
+    url = f"https://observable-api.starboard.ventures/network_storage_capacity/total_qa_bytes_power"
+    r = requests.get(url)
+    qap_df = pd.DataFrame(r.json()["data"])
+    qap_df["date"] = pd.to_datetime(qap_df["stat_date"])
+    qap_df["qa_power"] = qap_df["total_qa_bytes_power"].astype(float)
+    qap_df = qap_df[["date", "qa_power"]]
+    return qap_df
