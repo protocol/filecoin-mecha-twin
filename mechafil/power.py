@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import datetime
 from typing import Callable, Tuple, Union
+import numbers
 
 # --------------------------------------------------------------------------------------
 #  QA Multiplier functions
@@ -40,7 +41,7 @@ def forecast_qa_daily_onboardings(
     # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
     qa_onboard_power = qa_factor * rb_onboard_power
-    if isinstance(rb_onboard_power, float):
+    if isinstance(rb_onboard_power, numbers.Number):
         qa_onboarded_power_vec = np.ones(forecast_lenght) * qa_onboard_power
     else:
         qa_onboarded_power_vec = qa_onboard_power
@@ -123,14 +124,14 @@ def forecast_power_stats(
     duration_m: Callable = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Forecast onboards
-    if isinstance(renewal_rate, float):
+    if isinstance(renewal_rate, numbers.Number):
         renewal_rate_vec = np.ones(forecast_lenght) * renewal_rate
     else:
         assert len(renewal_rate) == forecast_lenght, \
             "if renewal_rate is provided as a vector, it must be the same length as the forecast length"
         renewal_rate_vec = renewal_rate
 
-    if isinstance(rb_onboard_power, float):
+    if isinstance(rb_onboard_power, numbers.Number):
         day_rb_onboarded_power = forecast_rb_daily_onboardings(
             rb_onboard_power, forecast_lenght
         )
@@ -175,7 +176,7 @@ def forecast_power_stats(
             day_qa_renewed_power,
             duration,
         )
-        fpr = fil_plus_rate if isinstance(fil_plus_rate, float) else fil_plus_rate[day_i]
+        fpr = fil_plus_rate if isinstance(fil_plus_rate, numbers.Number) else fil_plus_rate[day_i]
         day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
             day_i,
             day_rb_scheduled_expire_power,
