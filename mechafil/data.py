@@ -33,7 +33,9 @@ def get_sector_expiration_stats(
     ]
     rbp_expire_vec = filter_scheduled_df["total_rb"].values
     qap_expire_vec = filter_scheduled_df["total_qa"].values
-    pledge_release_vec = filter_scheduled_df["total_pledge"].values
+    # we need the entire history of known_scheduled_pledge_release, so get the
+    # data from the entire time-window, not just from current-date onwards
+    pledge_release_vec = scheduled_df["total_pledge"].values
     return rbp_expire_vec, qap_expire_vec, pledge_release_vec
 
 
