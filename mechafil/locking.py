@@ -1,5 +1,7 @@
 import numpy as np
 
+GIB = 2**30
+
 # Block reward collateral
 def compute_day_locked_rewards(day_network_reward: float) -> float:
     return 0.75 * day_network_reward
@@ -121,7 +123,9 @@ def compute_new_pledge_for_added_power(
     consensus_pledge = lock_target * prev_circ_supply * normalized_qap_growth
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
-    return added_pledge
+
+    pledge_cap = day_added_qa_power * 1./GIB  # The # of bytes in a GiB (Gibibyte)
+    return min(pledge_cap, added_pledge)
 
 
 def get_day_schedule_pledge_release(
