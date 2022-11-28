@@ -5,6 +5,18 @@ from typing import Callable, Tuple, Union
 import numbers
 
 # --------------------------------------------------------------------------------------
+#  Utility functions
+# --------------------------------------------------------------------------------------
+def scalar_or_vector_to_vector(input_x, expected_len, err_msg=None):
+    if isinstance(input_x, numbers.Number):
+        return np.ones(expected_len) * input_x
+    else:
+        err_msg_out = "vector input does not match expected length!" if err_msg is None else err_msg
+        assert len(input_x) == expected_len, err_msg_out
+        return input_x
+
+
+# --------------------------------------------------------------------------------------
 #  QA Multiplier functions
 # --------------------------------------------------------------------------------------
 def compute_qa_factor(
@@ -12,7 +24,7 @@ def compute_qa_factor(
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
     duration: int = None,
-) -> float:
+) -> Union[np.array, float]:
     fil_plus_multipler = 1.0 + (fil_plus_m - 1) * fil_plus_rate
     if duration_m is None:
         return fil_plus_multipler
@@ -26,7 +38,9 @@ def compute_qa_factor(
 def forecast_rb_daily_onboardings(
     rb_onboard_power: float, forecast_lenght: int
 ) -> np.array:
-    rb_onboarded_power_vec = np.ones(forecast_lenght) * rb_onboard_power
+    rb_onboarded_power_vec = scalar_or_vector_to_vector(rb_onboard_power, forecast_lenght,
+        err_msg="If rb_onboard_power is provided as a vector, it must be the same length as the forecast length")
+    # rb_onboarded_power_vec = np.ones(forecast_lenght) * rb_onboard_power
     return rb_onboarded_power_vec
 
 
@@ -41,11 +55,14 @@ def forecast_qa_daily_onboardings(
     # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
     qa_onboard_power = qa_factor * rb_onboard_power
-    if isinstance(rb_onboard_power, numbers.Number):
-        qa_onboarded_power_vec = np.ones(forecast_lenght) * qa_onboard_power
-    else:
-        qa_onboarded_power_vec = qa_onboard_power
-    return qa_onboarded_power_vec
+    qa_onboard_power_vec = scalar_or_vector_to_vector(qa_onboard_power, forecast_lenght,
+        err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length")
+    # if isinstance(rb_onboard_power, numbers.Number):
+    #     qa_onboarded_power_vec = np.ones(forecast_lenght) * qa_onboard_power
+    # else:
+    #     assert len(qa_onboard_power) == forecast_lenght
+    #     qa_onboarded_power_vec = qa_onboard_power
+    return qa_onboard_power_vec
 
 
 # --------------------------------------------------------------------------------------
@@ -56,7 +73,6 @@ def compute_day_rb_renewed_power(
     day_scheduled_expire_power_vec: np.array,
     renewal_rate_vec: np.array,
 ):
-    #day_renewed_power = renewal_rate_vec[-1:] * day_scheduled_expire_power_vec[day_i]
     day_renewed_power = renewal_rate_vec[day_i] * day_scheduled_expire_power_vec[day_i]
     return day_renewed_power
 
@@ -70,10 +86,8 @@ def compute_day_qa_renewed_power(
     duration_m: Callable = None,
     duration: int = None,
 ):
-    qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
-    # day_renewed_power = (
-    #     qa_factor * renewal_rate_vec[-1:] * day_rb_scheduled_expire_power_vec[day_i]
-    # )
+    fpr = fil_plus_rate if isinstance(fil_plus_rate, numbers.Number) else fil_plus_rate[day_i]
+    qa_factor = compute_qa_factor(fpr, fil_plus_m, duration_m, duration)
     day_renewed_power = (
         qa_factor * renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
     )
@@ -131,14 +145,9 @@ def forecast_power_stats(
             "if renewal_rate is provided as a vector, it must be the same length as the forecast length"
         renewal_rate_vec = renewal_rate
 
-    if isinstance(rb_onboard_power, numbers.Number):
-        day_rb_onboarded_power = forecast_rb_daily_onboardings(
-            rb_onboard_power, forecast_lenght
-        )
-    else:
-        assert len(rb_onboard_power) == forecast_lenght, \
-            "if rb_onboard_power is provided as a vector, it must be the same length as the forecast length"
-        day_rb_onboarded_power = rb_onboard_power
+    day_rb_onboarded_power = forecast_rb_daily_onboardings(
+        rb_onboard_power, forecast_lenght
+    )
 
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
@@ -176,13 +185,11 @@ def forecast_power_stats(
             day_qa_renewed_power,
             duration,
         )
-        fpr = fil_plus_rate if isinstance(fil_plus_rate, numbers.Number) else fil_plus_rate[day_i]
         day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
             day_i,
             day_rb_scheduled_expire_power,
-            # renewal_rate_vec[-1:],
             renewal_rate_vec,
-            fpr,
+            fil_plus_rate,
             fil_plus_m,
             duration_m,
             duration,
@@ -241,8 +248,6 @@ def forecast_power_stats(
 # --------------------------------------------------------------------------------------
 #  Build power stats DataFrame
 # --------------------------------------------------------------------------------------
-
-
 def build_full_power_stats_df(
     stats_df: pd.DataFrame,
     rb_power_df: pd.DataFrame,
