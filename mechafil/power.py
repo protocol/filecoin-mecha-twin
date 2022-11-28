@@ -132,12 +132,8 @@ def forecast_power_stats(
     duration_m: Callable = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Forecast onboards
-    if isinstance(renewal_rate, numbers.Number):
-        renewal_rate_vec = np.ones(forecast_lenght) * renewal_rate
-    else:
-        assert len(renewal_rate) == forecast_lenght, \
-            "if renewal_rate is provided as a vector, it must be the same length as the forecast length"
-        renewal_rate_vec = renewal_rate
+    renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, forecast_lenght,
+        err_msg="If renewal_rate is provided as a vector, it must be the same length as the forecast length")
 
     day_rb_onboarded_power = forecast_rb_daily_onboardings(
         rb_onboard_power, forecast_lenght
