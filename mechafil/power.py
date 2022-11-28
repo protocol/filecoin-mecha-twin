@@ -40,7 +40,6 @@ def forecast_rb_daily_onboardings(
 ) -> np.array:
     rb_onboarded_power_vec = scalar_or_vector_to_vector(rb_onboard_power, forecast_lenght,
         err_msg="If rb_onboard_power is provided as a vector, it must be the same length as the forecast length")
-    # rb_onboarded_power_vec = np.ones(forecast_lenght) * rb_onboard_power
     return rb_onboarded_power_vec
 
 
@@ -57,11 +56,6 @@ def forecast_qa_daily_onboardings(
     qa_onboard_power = qa_factor * rb_onboard_power
     qa_onboard_power_vec = scalar_or_vector_to_vector(qa_onboard_power, forecast_lenght,
         err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length")
-    # if isinstance(rb_onboard_power, numbers.Number):
-    #     qa_onboarded_power_vec = np.ones(forecast_lenght) * qa_onboard_power
-    # else:
-    #     assert len(qa_onboard_power) == forecast_lenght
-    #     qa_onboarded_power_vec = qa_onboard_power
     return qa_onboard_power_vec
 
 
