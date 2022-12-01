@@ -277,11 +277,13 @@ def build_full_power_stats_df(
     ]
     # Forecasted power
     forecast_power_df = rb_power_df[["total_raw_power_eib"]]
-    forecast_power_df["total_qa_power_eib"] = qa_power_df["total_qa_power_eib"]
-    forecast_power_df["day_onboarded_qa_power_pib"] = qa_power_df["onboarded_power"]
-    forecast_power_df["day_renewed_qa_power_pib"] = qa_power_df["renewed_power"]
+    forecast_power_df.loc[:, "total_qa_power_eib"] = qa_power_df["total_qa_power_eib"]
+    forecast_power_df.loc[:, "day_onboarded_qa_power_pib"] = qa_power_df[
+        "onboarded_power"
+    ]
+    forecast_power_df.loc[:, "day_renewed_qa_power_pib"] = qa_power_df["renewed_power"]
     forecast_start_date = current_date + datetime.timedelta(days=1)
-    forecast_power_df["date"] = pd.date_range(
+    forecast_power_df.loc[:, "date"] = pd.date_range(
         start=forecast_start_date, end=end_date, freq="d"
     )
     forecast_power_df["date"] = forecast_power_df["date"].dt.date
