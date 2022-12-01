@@ -13,10 +13,12 @@ from .locking import (
 """
 There is still a small discrepancy between the actual locked FIL and forecasted
 locked FIL. We believe that it could be due to the following reasons:
-  a) Sector durations are not unlocked after exactly 1y. In general they’re distributed and slightly longer. But in that case I’d expect the sign of the error to be the opposite to observed.
+  a) Sector durations are not unlocked after exactly 1y. In general the're distributed and slightly longer. But in that case I’d expect the sign of the error to be the opposite to observed.
   b) The error between actual and forecasted locked FIL is 0 for day_idx=1. This might imply that a build up of errors due to an error in `day_locked_pledge` sounds more like it could be the issue.
   c) If we're sure the locking discrepancy is not a bug but rather a deficiency in the model popping up via the approximations used, we may way want to include a learnable factor to correct the difference
 """
+
+
 def forecast_circulating_supply_df(
     start_date: datetime.date,
     current_date: datetime.date,

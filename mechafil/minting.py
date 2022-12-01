@@ -71,7 +71,9 @@ def cum_simple_minting(day: int) -> float:
     return SIMPLE_ALLOC * (1 - np.exp(-LAMBDA * day))
 
 
-def compute_baseline_power_array(start_date: datetime.date, end_date: datetime.date):
+def compute_baseline_power_array(
+    start_date: datetime.date, end_date: datetime.date
+) -> np.array:
     arr_len = (end_date - start_date).days
     exponents = np.arange(0, arr_len)
     init_baseline = get_storage_baseline_value(start_date)
