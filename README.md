@@ -29,7 +29,7 @@ python setup.py install
 
 ## Usage
 
-There is an high-level function that can be used to run a forecast/simulation of circulating supply and its components. First you need to import the relevant packages:
+There is a high-level function that can be used to run a forecast/simulation of circulating supply and its components. First you need to import the relevant packages:
 
 ```python
 import mechafil
