@@ -4,8 +4,8 @@ Mechanistic model for the Filecoin Economy. You can use this model to forecast a
 
 * Forecasting is done daily. This means that each forecasting step corresponds to a day and the forecasted metrics correspond to the value we expect to see at the end of that day.
 * The model uses the current sector states (i.e. known schedule expirations) and it estimates future onboardings and future renewals.
-* The daily power onboarded is a constant provided as a tunable parameter.
-* The sector renewal rate is a constant provided as a tunable parameter.
+* The daily power onboarded is provided as a tunable parameter.
+* The sector renewal rates are provided as a tunable parameter.
 * Sector duration is a constant provided as a tunable parameter.
 * Filecoin Plus sectors have the same renewal rates and sector durations as other sectors.
 * The model uses the current pledge metrics (i.e. known scheduled expiration in pledge) to measure known active sectors, and it estimates pledge metrics coming from future onboardings and renewals using the same assumptions as the ones used to model storage power.
@@ -66,7 +66,9 @@ fil_plus_rate = 0.098
 duration = 360
 ```
 
-An important note regarding the dates - due to data availability, the start date cannot be earlier than 2021-03-15!
+Two important notes regarding the inputs:
+* Due to data availability, the start date cannot be earlier than 2021-03-15.
+* The parameters `renewal_rate`, `rb_onboard_power` and `fil_plus_rate` can be a single number or a vector of numbers. If they are a number, the model assumes that number as a constant throughout the simulation. If a vector is provided, then the vector needs to have the same size as the simulation length. The vector option gives the user the most flexibility since they can apply different constants throughtout the simulation.
 
 Now, you can call the simulation function and collect the data in a DataFrame:
 

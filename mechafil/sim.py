@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime
+from typing import Union
 
 from .data import get_historical_network_stats, get_sector_expiration_stats
 from .power import forecast_power_stats, build_full_power_stats_df
@@ -13,9 +14,9 @@ def run_simple_sim(
     start_date: datetime.date,
     current_date: datetime.date,
     forecast_length: int,
-    renewal_rate: float,
-    rb_onboard_power: float,
-    fil_plus_rate: float,
+    renewal_rate: Union[np.array, float],
+    rb_onboard_power: Union[np.array, float],
+    fil_plus_rate: Union[np.array, float],
     duration: int,
 ) -> pd.DataFrame:
     end_date = current_date + datetime.timedelta(days=forecast_length)
