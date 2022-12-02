@@ -1,6 +1,17 @@
 # Filecoin Mechanical Twin
 
-Mechanistic model for the Filecoin Economy. You can use this model to forecast all the components underlying Filecoin's circulating supply (i.e., minting, vesting, locking and burning), based on simple assumption about future storage provider behavior.
+Mechanistic model for the Filecoin Economy. You can use this model to forecast all the components underlying Filecoin's circulating supply (i.e., minting, vesting, locking and burning), based on a set of parameters that encode storage provider behavior. The model uses the following assumptions:
+
+* Forecasting is done daily. This means that each forecasting step corresponds to a day and the forecasted metrics correspond to the value we expect to see at the end of that day.
+* The model uses the current sector states (i.e. known schedule expirations) and it estimates future onboardings and future renewals.
+* The daily power onboarded is a constant provided as a tunable parameter.
+* The sector renewal rate is a constant provided as a tunable parameter.
+* Sector duration is a constant provided as a tunable parameter.
+* Filecoin Plus sectors have the same renewal rates and sector durations as other sectors.
+* The model uses the current pledge metrics (i.e. known scheduled expiration in pledge) to measure known active sectors, and it estimates pledge metrics coming from future onboardings and renewals using the same assumptions as the ones used to model storage power.
+* The model ignores storage deal collateral when computing the total locked FIL.
+
+To learn more about how the model is designed, check the specifications linked at the end of this readme.
 
 
 ## Prerequisites
