@@ -9,7 +9,7 @@ PIB = 2**50
 
 def get_historical_network_stats(
     start_date: datetime.date, current_date: datetime.date, end_date: datetime.date
-):
+) -> pd.DataFrame:
     power_df = query_starboard_power_stats(start_date, current_date)
     onboards_df = query_starboard_daily_power_onboarded(start_date, current_date)
     stats_df = query_starboard_supply_stats(start_date, current_date)
@@ -26,7 +26,7 @@ def get_sector_expiration_stats(
     start_date: datetime.date,
     current_date: datetime.date,
     end_date: datetime.date,
-):
+) -> pd.DataFrame:
     scheduled_df = query_starboard_sector_expirations(start_date, end_date)
     filter_scheduled_df = scheduled_df[
         scheduled_df["date"] >= pd.to_datetime(current_date, utc="UTC")
@@ -99,7 +99,7 @@ def query_starboard_sector_expirations(
 def query_starboard_daily_power_onboarded(
     start_date: datetime.date,
     end_date: datetime.date,
-):
+) -> pd.DataFrame:
     # Get data from prove-commit-split-d API
     url = f"https://observable-api.starboard.ventures/api/v1/observable/prove-commit-split-d-v2?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
@@ -129,7 +129,7 @@ def query_starboard_daily_power_onboarded(
 def query_starboard_supply_stats(
     start_date: datetime.date,
     end_date: datetime.date,
-):
+) -> pd.DataFrame:
     url = f"https://observable-api.starboard.ventures/api/v1/observable/circulating-supply?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
     raw_stats_df = pd.DataFrame(r.json()["data"])
@@ -152,7 +152,9 @@ def query_starboard_supply_stats(
     return stats_df
 
 
-def query_starboard_power_stats(start_date: datetime.date, end_date: datetime.date):
+def query_starboard_power_stats(
+    start_date: datetime.date, end_date: datetime.date
+) -> pd.DataFrame:
     url = f"https://observable-api.starboard.ventures/network_storage_capacity?start={str(start_date)}&end={str(end_date)}"
     r = requests.get(url)
     power_df = pd.DataFrame(r.json()["data"])
@@ -184,7 +186,7 @@ def get_storage_baseline_value(date: datetime.date) -> float:
     return init_baseline_bytes
 
 
-def get_cum_capped_rb_power(date: datetime.date):
+def get_cum_capped_rb_power(date: datetime.date) -> float:
     # Query data sources and join
     rbp_df = query_historical_rb_power()
     bp_df = query_historical_baseline_power()
@@ -197,7 +199,7 @@ def get_cum_capped_rb_power(date: datetime.date):
     return init_cum_capped_power
 
 
-def get_cum_capped_qa_power(date: datetime.date):
+def get_cum_capped_qa_power(date: datetime.date) -> float:
     # Query data sources and join
     qap_df = query_historical_qa_power()
     bp_df = query_historical_baseline_power()
@@ -210,7 +212,7 @@ def get_cum_capped_qa_power(date: datetime.date):
     return init_cum_capped_power
 
 
-def get_vested_amount(date: datetime.date):
+def get_vested_amount(date: datetime.date) -> float:
     start_date = date - datetime.timedelta(days=1)
     end_date = date + datetime.timedelta(days=1)
     stats_df = query_starboard_supply_stats(start_date, end_date)
@@ -236,6 +238,7 @@ def query_historical_rb_power() -> pd.DataFrame:
     rbp_df["rb_power"] = rbp_df["total_raw_bytes_power"].astype(float)
     rbp_df = rbp_df[["date", "rb_power"]]
     return rbp_df
+
 
 def query_historical_qa_power() -> pd.DataFrame:
     url = f"https://observable-api.starboard.ventures/network_storage_capacity/total_qa_bytes_power"

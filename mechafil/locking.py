@@ -7,7 +7,7 @@ def compute_day_locked_rewards(day_network_reward: float) -> float:
     return 0.75 * day_network_reward
 
 
-def compute_day_reward_release(prev_network_locked_reward):
+def compute_day_reward_release(prev_network_locked_reward: float) -> float:
     return prev_network_locked_reward / 180.0
 
 
@@ -22,7 +22,7 @@ def compute_day_delta_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float = 0.3,
-):
+) -> float:
     onboards_delta = compute_new_pledge_for_added_power(
         day_network_reward,
         prev_circ_supply,
@@ -54,7 +54,7 @@ def compute_day_locked_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float = 0.3,
-):
+) -> float:
     # Total locked from new onboards
     onboards_locked = compute_new_pledge_for_added_power(
         day_network_reward,
@@ -89,7 +89,7 @@ def compute_renewals_delta_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float,
-):
+) -> float:
     # Delta from sectors expiring
     expire_delta = -(1 - renewal_rate) * scheduled_pledge_release
     # Delta from sector renewing
@@ -124,7 +124,7 @@ def compute_new_pledge_for_added_power(
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
 
-    pledge_cap = day_added_qa_power * 1./GIB  # The # of bytes in a GiB (Gibibyte)
+    pledge_cap = day_added_qa_power * 1.0 / GIB  # The # of bytes in a GiB (Gibibyte)
     return min(pledge_cap, added_pledge)
 
 
@@ -134,7 +134,7 @@ def get_day_schedule_pledge_release(
     day_pledge_locked_vec: np.array,
     known_scheduled_pledge_release_vec: np.array,
     duration: int,
-):
+) -> float:
     # scheduled releases coming from known active sectors
     if day_i > len(known_scheduled_pledge_release_vec) - 1:
         known_day_release = 0.0

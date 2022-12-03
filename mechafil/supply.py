@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import datetime
+from typing import Union
 
 from .locking import (
     get_day_schedule_pledge_release,
@@ -9,14 +10,17 @@ from .locking import (
     compute_day_locked_rewards,
     compute_day_locked_pledge,
 )
+from .power import scalar_or_vector_to_vector
 
 """
 There is still a small discrepancy between the actual locked FIL and forecasted
 locked FIL. We believe that it could be due to the following reasons:
-  a) Sector durations are not unlocked after exactly 1y. In general they’re distributed and slightly longer. But in that case I’d expect the sign of the error to be the opposite to observed.
+  a) Sector durations are not unlocked after exactly 1y. In general they're distributed and slightly longer. But in that case I’d expect the sign of the error to be the opposite to observed.
   b) The error between actual and forecasted locked FIL is 0 for day_idx=1. This might imply that a build up of errors due to an error in `day_locked_pledge` sounds more like it could be the issue.
   c) If we're sure the locking discrepancy is not a bug but rather a deficiency in the model popping up via the approximations used, we may way want to include a learnable factor to correct the difference
 """
+
+
 def forecast_circulating_supply_df(
     start_date: datetime.date,
     current_date: datetime.date,
@@ -25,7 +29,7 @@ def forecast_circulating_supply_df(
     locked_fil_zero: float,
     daily_burnt_fil: float,
     duration: int,
-    renewal_rate_vec: np.array,
+    renewal_rate: Union[np.array, float],
     burnt_fil_vec: np.array,
     vest_df: pd.DataFrame,
     mint_df: pd.DataFrame,
@@ -43,12 +47,13 @@ def forecast_circulating_supply_df(
         circ_supply_zero,
         locked_fil_zero,
         burnt_fil_vec,
-        mint_df,
         vest_df,
+        mint_df,
     )
     circ_supply = circ_supply_zero
-    # Simulation for loop
     sim_len = end_day - start_day
+    renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, sim_len)
+    # Simulation for loop
     current_day_idx = current_day - start_day
     for day_idx in range(1, sim_len):
         # Compute daily change in initial pledge collateral
@@ -61,34 +66,34 @@ def forecast_circulating_supply_df(
             duration,
         )
         pledge_delta = compute_day_delta_pledge(
-            df["day_network_reward"][day_idx],
+            df["day_network_reward"].iloc[day_idx],
             circ_supply,
-            df["day_onboarded_power_QAP"][day_idx],
-            df["day_renewed_power_QAP"][day_idx],
-            df["network_QAP"][day_idx],
-            df["network_baseline"][day_idx],
+            df["day_onboarded_power_QAP"].iloc[day_idx],
+            df["day_renewed_power_QAP"].iloc[day_idx],
+            df["network_QAP"].iloc[day_idx],
+            df["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target,
         )
         # Get total locked pledge (needed for future day_locked_pledge)
         day_locked_pledge = compute_day_locked_pledge(
-            df["day_network_reward"][day_idx],
+            df["day_network_reward"].iloc[day_idx],
             circ_supply,
-            df["day_onboarded_power_QAP"][day_idx],
-            df["day_renewed_power_QAP"][day_idx],
-            df["network_QAP"][day_idx],
-            df["network_baseline"][day_idx],
+            df["day_onboarded_power_QAP"].iloc[day_idx],
+            df["day_renewed_power_QAP"].iloc[day_idx],
+            df["network_QAP"].iloc[day_idx],
+            df["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target,
         )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(
-            df["day_network_reward"][day_idx]
+            df["day_network_reward"].iloc[day_idx]
         )
         day_reward_release = compute_day_reward_release(
-            df["network_locked_reward"][day_idx - 1]
+            df["network_locked_reward"].iloc[day_idx - 1]
         )
         reward_delta = day_locked_rewards - day_reward_release
         # Update dataframe
@@ -109,11 +114,13 @@ def forecast_circulating_supply_df(
             )
         # Find circulating supply balance and update
         circ_supply = (
-            df["disbursed_reserve"][day_idx]  # from initialise_circulating_supply_df
-            + df["cum_network_reward"][day_idx]  # from the minting_model
-            + df["total_vest"][day_idx]  # from vesting_model
-            - df["network_locked"][day_idx]  # from simulation loop
-            - df["network_gas_burn"][day_idx]  # comes from user inputs
+            df["disbursed_reserve"].iloc[
+                day_idx
+            ]  # from initialise_circulating_supply_df
+            + df["cum_network_reward"].iloc[day_idx]  # from the minting_model
+            + df["total_vest"].iloc[day_idx]  # from vesting_model
+            - df["network_locked"].iloc[day_idx]  # from simulation loop
+            - df["network_gas_burn"].iloc[day_idx]  # comes from user inputs
         )
         df["circ_supply"].iloc[day_idx] = max(circ_supply, 0)
     return df
@@ -154,5 +161,5 @@ def initialise_circulating_supply_df(
     df["network_locked"].iloc[0] = locked_fil_zero
     df["circ_supply"].iloc[0] = circ_supply_zero
     df = df.merge(vest_df, on="date", how="inner")
-    df = df.merge(mint_df, on="date", how="inner")
+    df = df.merge(mint_df.drop(columns=["days"]), on="date", how="inner")
     return df

@@ -11,7 +11,9 @@ STORAGE_MINING = 0.55 * FIL_BASE
 MINING_RESERVE = 0.15 * FIL_BASE
 
 
-def compute_vesting_trajectory_df(start_date: datetime.date, end_date: datetime.date):
+def compute_vesting_trajectory_df(
+    start_date: datetime.date, end_date: datetime.date
+) -> pd.DataFrame:
     """
     15% to PL -> 6-year linear vesting
     5% to FIlecoin foundation -> 6-year linear vesting
@@ -50,9 +52,9 @@ def compute_vesting_trajectory_df(start_date: datetime.date, end_date: datetime.
     # Filter vesting trajectory for desired dates
     vest_df = full_vest_df[full_vest_df["date"] >= start_date]
     # Compute total cumulative vesting
-    vest_df["total_day_vest"] = vest_df.sum(axis=1)
+    vest_df.loc[:, "total_day_vest"] = vest_df.drop(columns=["date"]).sum(axis=1)
     start_vested_amt = get_vested_amount(start_date)
-    vest_df["total_vest"] = vest_df["total_day_vest"].cumsum() + start_vested_amt
+    vest_df.loc[:, "total_vest"] = vest_df["total_day_vest"].cumsum() + start_vested_amt
     vest_df = vest_df[["date", "total_vest"]]
     return vest_df
 

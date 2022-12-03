@@ -7,11 +7,17 @@ import numbers
 # --------------------------------------------------------------------------------------
 #  Utility functions
 # --------------------------------------------------------------------------------------
-def scalar_or_vector_to_vector(input_x, expected_len, err_msg=None):
+def scalar_or_vector_to_vector(
+    input_x: Union[np.array, float], expected_len: int, err_msg: str = None
+) -> np.array:
     if isinstance(input_x, numbers.Number):
         return np.ones(expected_len) * input_x
     else:
-        err_msg_out = "vector input does not match expected length!" if err_msg is None else err_msg
+        err_msg_out = (
+            "vector input does not match expected length!"
+            if err_msg is None
+            else err_msg
+        )
         assert len(input_x) == expected_len, err_msg_out
         return input_x
 
@@ -38,8 +44,11 @@ def compute_qa_factor(
 def forecast_rb_daily_onboardings(
     rb_onboard_power: float, forecast_lenght: int
 ) -> np.array:
-    rb_onboarded_power_vec = scalar_or_vector_to_vector(rb_onboard_power, forecast_lenght,
-        err_msg="If rb_onboard_power is provided as a vector, it must be the same length as the forecast length")
+    rb_onboarded_power_vec = scalar_or_vector_to_vector(
+        rb_onboard_power,
+        forecast_lenght,
+        err_msg="If rb_onboard_power is provided as a vector, it must be the same length as the forecast length",
+    )
     return rb_onboarded_power_vec
 
 
@@ -54,8 +63,11 @@ def forecast_qa_daily_onboardings(
     # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
     qa_onboard_power = qa_factor * rb_onboard_power
-    qa_onboard_power_vec = scalar_or_vector_to_vector(qa_onboard_power, forecast_lenght,
-        err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length")
+    qa_onboard_power_vec = scalar_or_vector_to_vector(
+        qa_onboard_power,
+        forecast_lenght,
+        err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length",
+    )
     return qa_onboard_power_vec
 
 
@@ -66,7 +78,7 @@ def compute_day_rb_renewed_power(
     day_i: int,
     day_scheduled_expire_power_vec: np.array,
     renewal_rate_vec: np.array,
-):
+) -> float:
     day_renewed_power = renewal_rate_vec[day_i] * day_scheduled_expire_power_vec[day_i]
     return day_renewed_power
 
@@ -79,8 +91,12 @@ def compute_day_qa_renewed_power(
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
     duration: int = None,
-):
-    fpr = fil_plus_rate if isinstance(fil_plus_rate, numbers.Number) else fil_plus_rate[day_i]
+) -> float:
+    fpr = (
+        fil_plus_rate
+        if isinstance(fil_plus_rate, numbers.Number)
+        else fil_plus_rate[day_i]
+    )
     qa_factor = compute_qa_factor(fpr, fil_plus_m, duration_m, duration)
     day_renewed_power = (
         qa_factor * renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
@@ -97,7 +113,7 @@ def compute_day_se_power(
     day_onboard_vec: np.array,
     day_renewed_vec: np.array,
     duration: int,
-):
+) -> float:
     # Scheduled expirations coming from known active sectors
     if day_i > len(known_scheduled_expire_vec) - 1:
         known_day_se_power = 0.0
@@ -132,8 +148,11 @@ def forecast_power_stats(
     duration_m: Callable = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Forecast onboards
-    renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, forecast_lenght,
-        err_msg="If renewal_rate is provided as a vector, it must be the same length as the forecast length")
+    renewal_rate_vec = scalar_or_vector_to_vector(
+        renewal_rate,
+        forecast_lenght,
+        err_msg="If renewal_rate is provided as a vector, it must be the same length as the forecast length",
+    )
 
     day_rb_onboarded_power = forecast_rb_daily_onboardings(
         rb_onboard_power, forecast_lenght
@@ -245,7 +264,7 @@ def build_full_power_stats_df(
     start_date: datetime.date,
     current_date: datetime.date,
     end_date: datetime.date,
-):
+) -> pd.DataFrame:
     # Past power
     past_power_df = stats_df[
         [
@@ -258,11 +277,13 @@ def build_full_power_stats_df(
     ]
     # Forecasted power
     forecast_power_df = rb_power_df[["total_raw_power_eib"]]
-    forecast_power_df["total_qa_power_eib"] = qa_power_df["total_qa_power_eib"]
-    forecast_power_df["day_onboarded_qa_power_pib"] = qa_power_df["onboarded_power"]
-    forecast_power_df["day_renewed_qa_power_pib"] = qa_power_df["renewed_power"]
+    forecast_power_df.loc[:, "total_qa_power_eib"] = qa_power_df["total_qa_power_eib"]
+    forecast_power_df.loc[:, "day_onboarded_qa_power_pib"] = qa_power_df[
+        "onboarded_power"
+    ]
+    forecast_power_df.loc[:, "day_renewed_qa_power_pib"] = qa_power_df["renewed_power"]
     forecast_start_date = current_date + datetime.timedelta(days=1)
-    forecast_power_df["date"] = pd.date_range(
+    forecast_power_df.loc[:, "date"] = pd.date_range(
         start=forecast_start_date, end=end_date, freq="d"
     )
     forecast_power_df["date"] = forecast_power_df["date"].dt.date
