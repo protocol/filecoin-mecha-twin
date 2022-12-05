@@ -120,7 +120,7 @@ def compute_new_pledge_for_added_power(
     storage_pledge = 20.0 * day_network_reward * (day_added_qa_power / total_qa_power)
     # consensus collateral
     normalized_qap_growth = day_added_qa_power / max(total_qa_power, baseline_power)
-    consensus_pledge = lock_target * prev_circ_supply * normalized_qap_growth
+    consensus_pledge = max(lock_target * prev_circ_supply * normalized_qap_growth, 0)
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
 
