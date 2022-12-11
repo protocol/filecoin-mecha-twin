@@ -2,7 +2,8 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from .data import get_storage_baseline_value, get_cum_capped_rb_power
+from .data import get_storage_baseline_value, \
+    get_cum_capped_rb_power, get_cum_capped_qa_power
 
 EXBI = 2**60
 PIB = 2**50
@@ -60,6 +61,18 @@ def compute_minting_trajectory_df(
     # Add cumulative rewards and get daily rewards minted
     df["cum_network_reward"] = df["cum_baseline_reward"] + df["cum_simple_reward"]
     df["day_network_reward"] = df["cum_network_reward"].diff().fillna(method="backfill")
+
+    # TODO @kiran: this is messy, clean it up!
+    # compute QAP day_network_reward & expected ROI using QAP power
+    df['qap_capped_power'] = np.min(df[["network_baseline", "network_QAP"]].values, axis=1)
+    zero_cum_qap_capped_power = get_cum_capped_qa_power(start_date)
+    df["qap_cum_capped_power"] = df["qap_capped_power"].cumsum() + zero_cum_qap_capped_power
+    df["qap_network_time"] = df["qap_cum_capped_power"].pipe(network_time)
+    df["qap_cum_baseline_reward"] = df["qap_network_time"].pipe(cum_baseline_reward)
+    # Add cumulative rewards and get daily rewards minted
+    df["qap_cum_network_reward"] = df["qap_cum_baseline_reward"] + df["cum_simple_reward"]
+    df["qap_day_network_reward"] = df["qap_cum_network_reward"].diff().fillna(method="backfill")
+
     return df
 
 
