@@ -194,14 +194,17 @@ def forecast_power_stats(
             day_qa_renewed_power,
             duration,
         )
-        day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
-            day_i,
-            day_rb_scheduled_expire_power,
-            renewal_rate_vec,
-            fil_plus_rate,
-            fil_plus_m,
-            duration_m,
-            duration,
+        # day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
+        #     day_i,
+        #     day_rb_scheduled_expire_power,
+        #     renewal_rate_vec,
+        #     fil_plus_rate,
+        #     fil_plus_m,
+        #     duration_m,
+        #     duration,
+        # )
+        day_qa_renewed_power[day_i] = compute_day_rb_renewed_power(
+            day_i, day_qa_scheduled_expire_power, renewal_rate_vec
         )
     # Compute total scheduled expirations and renewals
     total_rb_scheduled_expire_power = day_rb_scheduled_expire_power.cumsum()
