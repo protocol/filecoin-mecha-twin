@@ -4,7 +4,11 @@ import datetime
 from typing import Union
 
 from .data import get_historical_network_stats, get_sector_expiration_stats
-from .power import forecast_power_stats, build_full_power_stats_df
+from .power import (
+    forecast_power_stats,
+    build_full_power_stats_df,
+    scalar_or_vector_to_vector,
+)
 from .vesting import compute_vesting_trajectory_df
 from .minting import compute_minting_trajectory_df
 from .supply import forecast_circulating_supply_df
@@ -73,6 +77,13 @@ def run_simple_sim(
     locked_fil_zero = start_day_stats["locked_fil"]
     daily_burnt_fil = fil_stats_df["burnt_fil"].diff().mean()
     burnt_fil_vec = fil_stats_df["burnt_fil"].values
+    forecast_renewal_rate_vec = scalar_or_vector_to_vector(
+        renewal_rate, forecast_length
+    )
+    past_renewal_rate_vec = fil_stats_df["rb_renewal_rate"].values
+    renewal_rate_vec = np.concatenate(
+        [past_renewal_rate_vec, forecast_renewal_rate_vec]
+    )
     cil_df = forecast_circulating_supply_df(
         start_date,
         current_date,
@@ -81,7 +92,7 @@ def run_simple_sim(
         locked_fil_zero,
         daily_burnt_fil,
         duration,
-        renewal_rate,
+        renewal_rate_vec,
         burnt_fil_vec,
         vest_df,
         mint_df,
