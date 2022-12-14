@@ -1,4 +1,4 @@
-# Filecoin Mechanical Twin
+# Filecoin Mechanistic Twin
 
 Mechanistic model for the Filecoin Economy. You can use this model to forecast all the components underlying Filecoin's circulating supply (i.e., minting, vesting, locking and burning), based on a set of parameters that encode storage provider behavior. The model uses the following assumptions:
 
@@ -66,9 +66,10 @@ fil_plus_rate = 0.098
 duration = 360
 ```
 
-Two important notes regarding the inputs:
+A few important notes regarding the inputs:
 * Due to data availability, the start date cannot be earlier than 2021-03-15.
-* The parameters `renewal_rate`, `rb_onboard_power` and `fil_plus_rate` can be a single number or a vector of numbers. If they are a number, the model assumes that number as a constant throughout the simulation. If a vector is provided, then the vector needs to have the same size as the simulation length. The vector option gives the user the most flexibility since they can apply different constants throughout the simulation.
+* The current date needs to be at least 2 days after the start date.
+* The parameters `renewal_rate`, `rb_onboard_power` and `fil_plus_rate` can be a single number or a vector of numbers. If they are a number, the model assumes that number as a constant throughout the forecasting period If a vector is provided, then the vector needs to have the same size as `forecast_length`. The vector option gives the user the most flexibility since they can apply different constants throughout the simulation.
 
 Now, you can call the simulation function and collect the data in a DataFrame:
 

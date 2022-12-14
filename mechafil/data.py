@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import numpy as np
 import datetime
+from typing import Tuple
 
 EXBI = 2**60
 PIB = 2**50
@@ -16,9 +17,11 @@ def get_historical_network_stats(
     stats_df = stats_df.merge(power_df, on="date", how="inner").merge(
         onboards_df, on="date", how="inner"
     )
-    stats_df["day_renewed_qa_power_pib"] = get_day_renewed_qa_power_stats(
+    rb_renewal_rate, day_renewed_qa_power = get_day_renewed_power_stats(
         start_date, current_date, end_date
     )
+    stats_df["rb_renewal_rate"] = rb_renewal_rate
+    stats_df["day_renewed_qa_power_pib"] = day_renewed_qa_power
     return stats_df
 
 
@@ -39,17 +42,20 @@ def get_sector_expiration_stats(
     return rbp_expire_vec, qap_expire_vec, pledge_release_vec
 
 
-def get_day_renewed_qa_power_stats(
+def get_day_renewed_power_stats(
     start_date: datetime.date,
     current_date: datetime.date,
     end_date: datetime.date,
-) -> np.array:
+) -> Tuple[np.array, np.array]:
     scheduled_df = query_starboard_sector_expirations(start_date, end_date)
     filter_scheduled_df = scheduled_df[
         scheduled_df["date"] < pd.to_datetime(current_date, utc="UTC")
     ]
+    rb_renewal_rate = (
+        filter_scheduled_df["extended_rb"] / filter_scheduled_df["total_rb"]
+    ).values
     day_renewed_qa_power = filter_scheduled_df["extended_qa"].values
-    return day_renewed_qa_power
+    return rb_renewal_rate, day_renewed_qa_power
 
 
 def query_starboard_sector_expirations(
