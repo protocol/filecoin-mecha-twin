@@ -146,7 +146,13 @@ def forecast_power_stats(
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
+    qap_method: str = 'tunable'  # can be set to tunable or basic
+                                 # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    qap_method = qap_method.lower()
+    if not (qap_method == 'basic' or qap_method == 'tunable'):
+        raise ValueError("qap_method must be either basic or tunable!")
+    
     # Forecast onboards
     renewal_rate_vec = scalar_or_vector_to_vector(
         renewal_rate,
@@ -194,18 +200,22 @@ def forecast_power_stats(
             day_qa_renewed_power,
             duration,
         )
-        # day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
-        #     day_i,
-        #     day_rb_scheduled_expire_power,
-        #     renewal_rate_vec,
-        #     fil_plus_rate,
-        #     fil_plus_m,
-        #     duration_m,
-        #     duration,
-        # )
-        day_qa_renewed_power[day_i] = compute_day_rb_renewed_power(
-            day_i, day_qa_scheduled_expire_power, renewal_rate_vec
-        )
+        
+        # see https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view for more details
+        if qap_method == 'tunable':
+            day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
+                day_i,
+                day_rb_scheduled_expire_power,
+                renewal_rate_vec,
+                fil_plus_rate,
+                fil_plus_m,
+                duration_m,
+                duration,
+            )
+        elif qap_method == 'basic':
+            day_qa_renewed_power[day_i] = compute_day_rb_renewed_power(
+                day_i, day_qa_scheduled_expire_power, renewal_rate_vec
+            )
     # Compute total scheduled expirations and renewals
     total_rb_scheduled_expire_power = day_rb_scheduled_expire_power.cumsum()
     total_rb_renewed_power = day_rb_renewed_power.cumsum()
