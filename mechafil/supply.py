@@ -53,6 +53,7 @@ def forecast_circulating_supply_df(
     circ_supply = circ_supply_zero
     sim_len = end_day - start_day
     renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, sim_len)
+
     # Simulation for loop
     current_day_idx = current_day - start_day
     for day_idx in range(1, sim_len):
