@@ -5,10 +5,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="mechaFIL",
-    version="1.2",
+    version="1.3",
     author="Maria Silva, Tom Mellan, Kiran Karra",
     author_email="misilva73@gmail.com, t.mellan@imperial.ac.uk, kiran.karra@gmail.com",
-    description="Deterministic model for the Filecoin Economy",
+    description="Mechanistic model for the Filecoin Economy",
     long_description=long_description,
     long_description_content_type="text/markdown",
     project_urls={
