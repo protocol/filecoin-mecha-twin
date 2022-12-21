@@ -53,6 +53,7 @@ def forecast_circulating_supply_df(
     circ_supply = circ_supply_zero
     sim_len = end_day - start_day
     renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, sim_len)
+
     # Simulation for loop
     current_day_idx = current_day - start_day
     for day_idx in range(1, sim_len):
@@ -77,7 +78,7 @@ def forecast_circulating_supply_df(
             lock_target,
         )
         # Get total locked pledge (needed for future day_locked_pledge)
-        day_locked_pledge = compute_day_locked_pledge(
+        day_locked_pledge, day_renewed_pledge = compute_day_locked_pledge(
             df["day_network_reward"].iloc[day_idx],
             circ_supply,
             df["day_onboarded_power_QAP"].iloc[day_idx],
@@ -98,6 +99,7 @@ def forecast_circulating_supply_df(
         reward_delta = day_locked_rewards - day_reward_release
         # Update dataframe
         df["day_locked_pledge"].iloc[day_idx] = day_locked_pledge
+        df["day_renewed_pledge"].iloc[day_idx] = day_renewed_pledge
         df["network_locked_pledge"].iloc[day_idx] = (
             df["network_locked_pledge"].iloc[day_idx - 1] + pledge_delta
         )
@@ -148,6 +150,7 @@ def initialise_circulating_supply_df(
                 burnt_fil_vec, (0, len_sim - len(burnt_fil_vec))
             ),
             "day_locked_pledge": np.zeros(len_sim),
+            "day_renewed_pledge": np.zeros(len_sim),
             "network_locked_pledge": np.zeros(len_sim),
             "network_locked": np.zeros(len_sim),
             "network_locked_reward": np.zeros(len_sim),

@@ -77,7 +77,7 @@ def compute_day_locked_pledge(
     renews_locked = max(original_pledge, new_pledge)
     # Total locked pledge
     locked = onboards_locked + renews_locked
-    return locked
+    return locked, renews_locked
 
 
 def compute_renewals_delta_pledge(

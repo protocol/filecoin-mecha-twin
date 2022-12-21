@@ -64,12 +64,15 @@ rb_onboard_power = 12.0
 fil_plus_rate = 0.098
 # Sector duration of newly onboarding sectors
 duration = 360
+# Method of computing QAP
+qap_method = 'tunable'
 ```
 
 A few important notes regarding the inputs:
 * Due to data availability, the start date cannot be earlier than 2021-03-15.
 * The current date needs to be at least 2 days after the start date.
-* The parameters `renewal_rate`, `rb_onboard_power` and `fil_plus_rate` can be a single number or a vector of numbers. If they are a number, the model assumes that number as a constant throughout the forecasting period If a vector is provided, then the vector needs to have the same size as `forecast_length`. The vector option gives the user the most flexibility since they can apply different constants throughout the simulation.
+* The parameters `renewal_rate`, `rb_onboard_power` and `fil_plus_rate` can be a single number or a vector of numbers. If they are a number, the model assumes that number as a constant throughout the simulation. If a vector is provided, then the vector needs to have the same size as the simulation length. The vector option gives the user the most flexibility since they can apply different constants throughout the simulation.
+* The optional parameter `qap_method` determines how network QAP will be computed. Two approaches are provided in the library, which we term `basic` and `tunable`. Setting this value to `tunable` will enable QAP to be computed with tunable sector duration multipliers, but note that this is an approximation. The other method is `basic` which does not support sector duration multipliers. See [here](https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view) for more details.
 
 Now, you can call the simulation function and collect the data in a DataFrame:
 
@@ -80,7 +83,8 @@ cil_df = mechafil.run_simple_sim(start_date,
     renewal_rate,
     rb_onboard_power,
     fil_plus_rate,
-    duration)
+    duration,
+    qap_method='tunable')
 
 cil_df.head()
 ```
