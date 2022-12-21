@@ -9,7 +9,7 @@ from .vesting import compute_vesting_trajectory_df
 from .minting import compute_minting_trajectory_df
 from .supply import forecast_circulating_supply_df
 
-from .input_validation import validate_qap_method
+from .utils import validate_qap_method
 
 def run_simple_sim(
     start_date: datetime.date,
