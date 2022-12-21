@@ -4,6 +4,8 @@ import datetime
 from typing import Callable, Tuple, Union
 import numbers
 
+from .utils import validate_qap_method
+
 # --------------------------------------------------------------------------------------
 #  Utility functions
 # --------------------------------------------------------------------------------------
@@ -74,7 +76,7 @@ def forecast_qa_daily_onboardings(
 # --------------------------------------------------------------------------------------
 #  Renewals
 # --------------------------------------------------------------------------------------
-def compute_day_rb_renewed_power(
+def compute_basic_day_renewed_power(
     day_i: int,
     day_scheduled_expire_power_vec: np.array,
     renewal_rate_vec: np.array,
@@ -149,9 +151,7 @@ def forecast_power_stats(
     qap_method: str = 'tunable'  # can be set to tunable or basic
                                  # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    qap_method = qap_method.lower()
-    if not (qap_method == 'basic' or qap_method == 'tunable'):
-        raise ValueError("qap_method must be either basic or tunable!")
+    validate_qap_method(qap_method)
     
     # Forecast onboards
     renewal_rate_vec = scalar_or_vector_to_vector(
@@ -189,7 +189,7 @@ def forecast_power_stats(
             day_rb_renewed_power,
             duration,
         )
-        day_rb_renewed_power[day_i] = compute_day_rb_renewed_power(
+        day_rb_renewed_power[day_i] = compute_basic_day_renewed_power(
             day_i, day_rb_scheduled_expire_power, renewal_rate_vec
         )
         # Quality-adjusted stats
@@ -213,7 +213,7 @@ def forecast_power_stats(
                 duration,
             )
         elif qap_method == 'basic':
-            day_qa_renewed_power[day_i] = compute_day_rb_renewed_power(
+            day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
                 day_i, day_qa_scheduled_expire_power, renewal_rate_vec
             )
     # Compute total scheduled expirations and renewals

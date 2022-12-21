@@ -9,6 +9,7 @@ from .vesting import compute_vesting_trajectory_df
 from .minting import compute_minting_trajectory_df
 from .supply import forecast_circulating_supply_df
 
+from .input_validation import validate_qap_method
 
 def run_simple_sim(
     start_date: datetime.date,
@@ -18,7 +19,11 @@ def run_simple_sim(
     rb_onboard_power: Union[np.array, float],
     fil_plus_rate: Union[np.array, float],
     duration: int,
+    qap_method: str = 'tunable' # can be set to tunable or basic
+                                # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> pd.DataFrame:
+    validate_qap_method(qap_method)
+
     end_date = current_date + datetime.timedelta(days=forecast_length)
     # Get sector scheduled expirations
     res = get_sector_expiration_stats(start_date, current_date, end_date)
@@ -41,6 +46,7 @@ def run_simple_sim(
         fil_plus_rate,
         duration,
         forecast_length,
+        qap_method=qap_method
     )
     rb_power_df["total_raw_power_eib"] = rb_power_df["total_power"] / 1024.0
     qa_power_df["total_qa_power_eib"] = qa_power_df["total_power"] / 1024.0
