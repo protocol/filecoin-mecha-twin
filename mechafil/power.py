@@ -61,10 +61,31 @@ def forecast_qa_daily_onboardings(
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
     duration: int = None,
+    intervention_day: int = None,
+    sdm_cc_onboard_before_intervention: bool = False,
+    sdm_cc_onboard_after_intervention: bool = True
 ) -> np.array:
     # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
-    qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
-    qa_onboard_power = qa_factor * rb_onboard_power
+    # qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
+    # qa_onboard_power = qa_factor * rb_onboard_power
+    filplus_rbp = rb_onboard_power * fil_plus_rate
+    notfilplus_rbp = rb_onboard_power * (1-fil_plus_rate)  # includes CC and regular deal, which both get SDM
+
+    filplus_factor = fil_plus_m if duration_m is None else fil_plus_m * duration_m(duration)
+    filplus_qap = filplus_rbp * filplus_factor
+
+    rbp_factor = 1 if duration_m is None else duration_m(duration)
+    # convert it to a vector to handle when durations happen and when they do not
+    rbp_factor_vec = np.ones(forecast_lenght)
+    if sdm_cc_onboard_before_intervention:
+        rbp_factor_vec[0:intervention_day] = rbp_factor
+    if sdm_cc_onboard_after_intervention:
+        rbp_factor_vec[intervention_day:] = rbp_factor
+    # print(np.mean(rbp_factor_vec), np.mean(rbp_factor_vec[0:intervention_day]), np.mean(rbp_factor_vec[intervention_day:]))
+    notfilplus_qap = notfilplus_rbp * rbp_factor_vec
+
+    qa_onboard_power = filplus_qap + notfilplus_qap
+    
     qa_onboard_power_vec = scalar_or_vector_to_vector(
         qa_onboard_power,
         forecast_lenght,
@@ -93,16 +114,42 @@ def compute_day_qa_renewed_power(
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
     duration: int = None,
+    intervention_day: int = None,
+    sdm_cc_renew_before_intervention: bool = False,
+    sdm_cc_renew_after_intervention: bool = True
 ) -> float:
     fpr = (
         fil_plus_rate
         if isinstance(fil_plus_rate, numbers.Number)
         else fil_plus_rate[day_i]
     )
-    qa_factor = compute_qa_factor(fpr, fil_plus_m, duration_m, duration)
-    day_renewed_power = (
-        qa_factor * renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
-    )
+    # qa_factor = compute_qa_factor(fpr, fil_plus_m, duration_m, duration)
+    # day_renewed_power = (
+    #     qa_factor * renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
+    # )
+
+    rb_power_to_renew = renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
+    filplus_renew = rb_power_to_renew * fpr
+    notfilplus_renew = rb_power_to_renew * (1-fpr)  # includes CC and regular deal, which both get SDM
+
+    filplus_factor = fil_plus_m if duration_m is None else fil_plus_m * duration_m(duration)
+    filplus_qap = filplus_renew * filplus_factor
+
+    rbp_factor_with_duration = 1 if duration_m is None else duration_m(duration)
+    if day_i < intervention_day:
+        if not sdm_cc_renew_before_intervention:
+            rbp_factor = 1
+        else:
+            rbp_factor = rbp_factor_with_duration
+    if day_i >= intervention_day:
+        if not sdm_cc_renew_after_intervention:
+            rbp_factor = 1
+        else:
+            rbp_factor = rbp_factor_with_duration
+    notfilplus_qap = notfilplus_renew * rbp_factor
+
+    day_renewed_power = filplus_qap + notfilplus_qap
+
     return day_renewed_power
 
 
@@ -148,11 +195,25 @@ def forecast_power_stats(
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
-    qap_method: str = 'tunable'  # can be set to tunable or basic
-                                 # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    qap_method: str = 'tunable',  # can be set to tunable or basic
+                                  # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    intervention_config: dict = None
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     validate_qap_method(qap_method)
     
+    if intervention_config is not None:
+        intervention_type = intervention_config['type']
+
+        intervention_date = intervention_config['intervention_date']
+        sim_start_date = intervention_config['simulation_start_date']
+        intervention_day = (intervention_date - sim_start_date).days
+        sdm_cc_onboard_before_intervention = intervention_config.get('sdm_cc_onboard_before_intervention', False)
+        sdm_cc_onboard_after_intervention = intervention_config.get('sdm_cc_onboard_after_intervention', True)
+        sdm_cc_renew_before_intervention = intervention_config.get('sdm_cc_renew_before_intervention', False)
+        sdm_cc_renew_after_intervention = intervention_config.get('sdm_cc_renew_after_intervention', True)
+    else:
+        raise Exception("TODO")
+
     # Forecast onboards
     renewal_rate_vec = scalar_or_vector_to_vector(
         renewal_rate,
@@ -172,6 +233,9 @@ def forecast_power_stats(
         fil_plus_m,
         duration_m,
         duration,
+        intervention_day=intervention_day,
+        sdm_cc_onboard_before_intervention=sdm_cc_onboard_before_intervention,
+        sdm_cc_onboard_after_intervention=sdm_cc_onboard_after_intervention,
     )
     total_qa_onboarded_power = day_qa_onboarded_power.cumsum()
     # Initialize scheduled expirations and renewals
@@ -189,9 +253,37 @@ def forecast_power_stats(
             day_rb_renewed_power,
             duration,
         )
+
+        if intervention_type == 'cc_early_renewal' and day_i == intervention_day:
+            # expire additional cc power to simulate renewal of that power on the intervention day
+            #   move it from scheduled_expire_vec from the future dates to the current date
+            known_days_future_expire = len(rb_known_scheduled_expire_vec[intervention_day+1:])
+            remaining_days_expire_model = 360 - known_days_future_expire  
+            # 360 means we will stop assuming sectors more that expire more than 360 days from intervention day will NOT engage in this behavior
+            # because CC sectors are usually 1 year?
+            notfilplus_future_expire_power_modeled = 0
+            for jj in range(remaining_days_expire_model):
+                day_jj = intervention_day - 360 + jj
+                notfilplus_future_expire_power_modeled += (day_rb_onboarded_power[day_jj] + day_rb_renewed_power[day_jj]) * (1-fil_plus_rate[day_jj])
+                # remove that power from these two vectors so that they aren't double counted
+                day_rb_onboarded_power[day_jj] *= fil_plus_rate[day_jj]
+                day_rb_renewed_power[day_jj] *= fil_plus_rate[day_jj]
+
+            notfilplus_future_expire_power_known = np.sum(rb_known_scheduled_expire_vec[intervention_day+1:] * (1-fil_plus_rate[intervention_day+1:intervention_day+1+known_days_future_expire]))
+            notfilplus_future_expire_power = notfilplus_future_expire_power_known + notfilplus_future_expire_power_modeled
+            day_rb_scheduled_expire_power[day_i] += notfilplus_future_expire_power
+            
+            # remove that power from future where it was borrowed from
+            rb_known_scheduled_expire_vec[intervention_day+1:] = rb_known_scheduled_expire_vec[intervention_day+1:] * fil_plus_rate[intervention_day+1:intervention_day+1+known_days_future_expire]  # only FIL+ remains
+        
         day_rb_renewed_power[day_i] = compute_basic_day_renewed_power(
             day_i, day_rb_scheduled_expire_power, renewal_rate_vec
         )
+        if intervention_type == 'cc_early_renewal' and day_i == intervention_day:
+            #   add the same power into the renewed power
+            #   NOTE: we do this independent of renewal-rate b/c it is unclear how to change that vector synchronously
+            day_rb_renewed_power[day_i] += notfilplus_future_expire_power
+        
         # Quality-adjusted stats
         day_qa_scheduled_expire_power[day_i] = compute_day_se_power(
             day_i,
@@ -200,7 +292,6 @@ def forecast_power_stats(
             day_qa_renewed_power,
             duration,
         )
-        
         # see https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view for more details
         if qap_method == 'tunable':
             day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
@@ -211,6 +302,9 @@ def forecast_power_stats(
                 fil_plus_m,
                 duration_m,
                 duration,
+                intervention_day=intervention_day,
+                sdm_cc_renew_before_intervention=sdm_cc_renew_before_intervention,
+                sdm_cc_renew_after_intervention=sdm_cc_renew_after_intervention
             )
         elif qap_method == 'basic':
             day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
