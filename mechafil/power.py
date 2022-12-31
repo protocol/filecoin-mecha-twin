@@ -217,7 +217,7 @@ def forecast_power_stats(
                                   # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
     intervention_config: dict = None
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    # validate_qap_method(qap_method)
+    validate_qap_method(qap_method)
 
     t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
     t_fpr_cur = [datetime.date(2022,12,1) + datetime.timedelta(days=x) for x in range(forecast_lenght)]
@@ -226,11 +226,11 @@ def forecast_power_stats(
     
     if intervention_config is not None:
         intervention_type = intervention_config['type']
-        cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 30)
+        cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 1)
 
         intervention_date = intervention_config['intervention_date']
         sim_start_date = intervention_config['simulation_start_date']
-        intervention_day = (intervention_date - sim_start_date).days
+        upgrade_day = (intervention_date - sim_start_date).days
         sdm_onboard_before_intervention = intervention_config.get('sdm_onboard_before_intervention', False)
         sdm_onboard_after_intervention = intervention_config.get('sdm_onboard_after_intervention', True)
         sdm_renew_before_intervention = intervention_config.get('sdm_renew_before_intervention', False)
@@ -250,9 +250,9 @@ def forecast_power_stats(
     )
 
     num_days_shock_behavior = 360
-    shock_days_vec = [intervention_day + k for k in range(num_days_shock_behavior)]
-    reonboard_days_vec = [intervention_day + k for k in range(1, cc_reonboard_time_days+1)]  # reonboard from intervention_day + 1
-
+    shock_days_vec = [upgrade_day + k for k in range(num_days_shock_behavior)]
+    reonboard_days_vec = [upgrade_day + k for k in range(cc_reonboard_time_days)]
+    print(reonboard_days_vec)
     # inputs are RenewalRate, RB Onboarding, and FIL+ rate.  
     # Setup the time indices for each to align the times when arrays are sliced.
     t_input_vec = np.asarray([sim_start_date + datetime.timedelta(days=x) for x in range(forecast_lenght)])
@@ -279,7 +279,11 @@ def forecast_power_stats(
         day_rb_renewed_power_tmp[day_i] = compute_basic_day_renewed_power(
             day_i, day_rb_scheduled_expire_power_tmp, renewal_rate_vec
         )
-    notfilplus_future_expire_power_to_transfer = 0
+    cc_future_expire_power_to_transfer_total = 0
+    cc_future_expire_vec = np.zeros(num_days_shock_behavior)
+    fpr_future_expire_vec = np.zeros(num_days_shock_behavior)
+    cc_future_expire_renewed_vec = np.zeros(num_days_shock_behavior)
+    fpr_future_expire_renewed_vec = np.zeros(num_days_shock_behavior)
     for jj in range(num_days_shock_behavior):
         jj_base = jj+t_input_intervention_start_ii
         rb_sched_expire_jj = day_rb_scheduled_expire_power_tmp[jj_base]
@@ -288,8 +292,17 @@ def forecast_power_stats(
         fpr_jj = jj_base+fpr_all_simindex_start-tmp_duration
         fpr_at_time_of_onboard_and_renew = fpr_all[fpr_jj] if fpr_jj > 0 else 0.001
         
-        notfilplus_future_expire_power_to_transfer += rb_sched_expire_jj * (1-fpr_at_time_of_onboard_and_renew) * rr_jj
-    print(notfilplus_future_expire_power_to_transfer)
+        cc_future_expire_vec[jj] = rb_sched_expire_jj * (1-fpr_at_time_of_onboard_and_renew)
+        fpr_future_expire_vec[jj] = rb_sched_expire_jj * fpr_at_time_of_onboard_and_renew
+        cc_future_expire_renewed_vec[jj] = cc_future_expire_vec[jj] * rr_jj
+        fpr_future_expire_renewed_vec[jj] = fpr_future_expire_vec[jj] * rr_jj
+        cc_future_expire_power_to_transfer_total += cc_future_expire_renewed_vec[jj]
+
+    print('cc future expire', np.sum(cc_future_expire_vec))
+    print('fpr future expire', np.sum(fpr_future_expire_vec))
+    print('[window] cc to expire that will be transferred', cc_future_expire_power_to_transfer_total, 
+           np.sum(cc_future_expire_renewed_vec))
+    print('[window] fpr to expire that will be renewed', np.sum(fpr_future_expire_renewed_vec))
     ########################################################################################################################
     
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
@@ -299,7 +312,7 @@ def forecast_power_stats(
         fil_plus_m,
         duration_m,
         duration,
-        intervention_day=intervention_day,
+        intervention_day=upgrade_day,
         sdm_onboard_before_intervention=sdm_onboard_before_intervention,
         sdm_onboard_after_intervention=sdm_onboard_after_intervention,
     )
@@ -312,12 +325,21 @@ def forecast_power_stats(
     day_qa_scheduled_expire_power_known = np.zeros(forecast_lenght)
     day_qa_scheduled_expire_power_model = np.zeros(forecast_lenght)
     day_qa_renewed_power = np.zeros(forecast_lenght)
+    # more debugging vars
+    total_rb_renewed_in_window = 0
+    total_rb_expired_in_window = 0
     # Run loop to forecast daily scheduled expirations and renewals
     for day_i in range(forecast_lenght):
         if intervention_type == 'cc_early_terminate_and_onboard' and day_i in reonboard_days_vec:
-            rbp_to_reonboard = notfilplus_future_expire_power_to_transfer/cc_reonboard_time_days
+            rbp_to_reonboard = cc_future_expire_power_to_transfer_total/cc_reonboard_time_days
+            # add to whatever was already scheduled to be onboarded
+            # print('before | day_rb_onboarded_power[%d]=%0.02f' % (day_i, day_rb_onboarded_power[day_i], ))
             day_rb_onboarded_power[day_i] += rbp_to_reonboard
             day_qa_onboarded_power[day_i] += (rbp_to_reonboard * duration_m(duration))  # get SDM when re-onboarding the CC sectors
+            # print('after | day_rb_onboarded_power[%d]=%0.02f' % (day_i, day_rb_onboarded_power[day_i], ))
+
+            # day_rb_onboarded_power[day_i] = rbp_to_reonboard
+            # day_qa_onboarded_power[day_i] = (rbp_to_reonboard * duration_m(duration))  # get SDM when re-onboarding the CC sectors
 
         # Raw-power stats
         rb_sched_expire_pwr_i, known_rb_se_power_i, model_rb_se_power_i = compute_day_se_power(
@@ -330,17 +352,23 @@ def forecast_power_stats(
         day_rb_scheduled_expire_power[day_i] = rb_sched_expire_pwr_i
         day_rb_scheduled_expire_power_known[day_i] = known_rb_se_power_i
         day_rb_scheduled_expire_power_model[day_i] = model_rb_se_power_i
-        cc_scheduled_renew_power_day = day_rb_scheduled_expire_power[day_i] * (1-fil_plus_rate[day_i]) * renewal_rate_vec[day_i]
         
         # during the "shock" window, only expire FIL+ % of power that was originally set to expire
         # because it was transferred over to either renewal or terminate+reonboard
         if (intervention_type == 'cc_early_renewal' or intervention_type == 'cc_early_terminate_and_onboard') and day_i in shock_days_vec:
-            # only expire FIL+ sectors, b/c we early renewed those sectors that were to be expired during this time-period
-            day_rb_scheduled_expire_power[day_i] *= fil_plus_rate[day_i]
+            # subtract off cc power that was scheduled to be renewed after expiration in the shock window
+            #  b/c it is instead renewed or terminated+reonboarded early in this time-period
+            day_rb_scheduled_expire_power[day_i] -= cc_future_expire_renewed_vec[day_i-upgrade_day]
+            total_rb_expired_in_window += cc_future_expire_renewed_vec[day_i-upgrade_day]
         
         day_rb_renewed_power[day_i] = compute_basic_day_renewed_power(
             day_i, day_rb_scheduled_expire_power, renewal_rate_vec
         )
+        if (intervention_type == 'cc_early_renewal' or intervention_type == 'cc_early_terminate_and_onboard') and day_i in shock_days_vec:
+            day_rb_renewed_power[day_i] = fpr_future_expire_renewed_vec[day_i-upgrade_day]
+        # for tracking purposes
+        if day_i in shock_days_vec:
+            total_rb_renewed_in_window += day_rb_renewed_power[day_i]
         
         # Quality-adjusted stats
         qa_sched_expire_pwr_i, known_qa_se_power_i, model_qa_se_power_i = compute_day_se_power(
@@ -357,7 +385,7 @@ def forecast_power_stats(
             # only expire FIL+ sectors, b/c we early renewed/terminated those sectors that were to be expired during this time-period
             # account for this in the QA power by removing CC power from power that is to be expired, since it was already. We also don't
             # apply the SDM here becuase the CC that was expired didn't have SDM.
-            day_qa_scheduled_expire_power[day_i] -= cc_scheduled_renew_power_day
+            day_qa_scheduled_expire_power[day_i] -= cc_future_expire_renewed_vec[day_i-upgrade_day]
 
         # see https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view for more details
         if qap_method == 'tunable':
@@ -374,12 +402,11 @@ def forecast_power_stats(
                     fil_plus_m,
                     duration_m,
                     duration,
-                    intervention_day=intervention_day,
+                    intervention_day=upgrade_day,
                     sdm_renew_before_intervention=sdm_renew_before_intervention,
                     sdm_renew_after_intervention=sdm_renew_after_intervention
                 )
             else:
-                # ################## THE ORIGINAL ######################
                 day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
                     day_i,
                     day_rb_scheduled_expire_power,
@@ -388,25 +415,10 @@ def forecast_power_stats(
                     fil_plus_m,
                     duration_m,
                     duration,
-                    intervention_day=intervention_day,
+                    intervention_day=upgrade_day,
                     sdm_renew_before_intervention=sdm_renew_before_intervention,
                     sdm_renew_after_intervention=sdm_renew_after_intervention
                 )
-                ########################################################
-                # temp_fpr_ii = day_i-duration+fpr_all_simindex_start
-                # temp_fpr = fpr_all[temp_fpr_ii] if temp_fpr_ii > 0 else 0
-                # day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
-                #     day_i,
-                #     day_rb_scheduled_expire_power,
-                #     renewal_rate_vec,
-                #     temp_fpr,
-                #     fil_plus_m,
-                #     duration_m,
-                #     duration,
-                #     intervention_day=intervention_day,
-                #     sdm_renew_before_intervention=sdm_renew_before_intervention,
-                #     sdm_renew_after_intervention=sdm_renew_after_intervention
-                # )
         elif qap_method == 'basic':
             day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
                 day_i, day_qa_scheduled_expire_power, renewal_rate_vec
@@ -416,24 +428,37 @@ def forecast_power_stats(
                 day_i, day_qa_scheduled_expire_power, renewal_rate_vec
             )
             sdm_factor_with_duration = 1 if duration_m is None else duration_m(duration)
-            if day_i < intervention_day:
+            if day_i < upgrade_day:
                 if not sdm_renew_before_intervention:
                     sdm_factor = 1
                 else:
                     sdm_factor = sdm_factor_with_duration
-            if day_i >= intervention_day:
+            if day_i >= upgrade_day:
                 if not sdm_renew_after_intervention:
                     sdm_factor = 1
                 else:
                     sdm_factor = sdm_factor_with_duration
             day_qa_renewed_power[day_i] *= sdm_factor
+            if (intervention_type == 'cc_early_renewal' or intervention_type == 'cc_early_terminate_and_onboard') and day_i in shock_days_vec:
+                day_qa_renewed_power[day_i] = fpr_future_expire_renewed_vec[day_i-upgrade_day] * duration_m(duration)
 
-        if intervention_type == 'cc_early_renewal' and day_i == intervention_day:
+        if intervention_type == 'cc_early_renewal' and day_i == upgrade_day:
             #   add the same power into the renewed power
             #   NOTE: we do this here to be independent of renewal_rate b/c and renew the exact amount of power we choose to
             #     instead of having it be factored by the renewal_rate
-            day_rb_renewed_power[day_i] += notfilplus_future_expire_power_to_transfer
-            day_qa_renewed_power[day_i] += duration_m(duration)*notfilplus_future_expire_power_to_transfer  # gets SDM when renewed
+
+            # expire
+            day_rb_scheduled_expire_power[day_i] += cc_future_expire_power_to_transfer_total
+            day_qa_scheduled_expire_power[day_i] += cc_future_expire_power_to_transfer_total  # no SDM when expiring
+            
+            # renew
+            # print('before-early-renewal[%d] | day_rb_renewed_power=%0.02f' % (day_i, day_rb_renewed_power[day_i], ))
+            day_rb_renewed_power[day_i] += cc_future_expire_power_to_transfer_total
+            day_qa_renewed_power[day_i] += duration_m(duration)*cc_future_expire_power_to_transfer_total  # gets SDM when renewed
+            # print('after-early-renewal[%d] | day_rb_renewed_power=%0.02f' % (day_i, day_rb_renewed_power[day_i], ))
+
+    print('total_rb_renewed_in_window=%0.02f total_rb_expired_removed=%0.02f' % \
+            (total_rb_renewed_in_window, total_rb_expired_in_window))
 
     # compute total powers
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
@@ -460,11 +485,28 @@ def forecast_power_stats(
         - total_qa_scheduled_expire_power
         + total_qa_renewed_power
     )
-
+    
     # terminate power to simulate early-termination, onboarding done in the loop above
     if intervention_type == 'cc_early_terminate_and_onboard':
-        rb_total_power[intervention_day] -= notfilplus_future_expire_power_to_transfer
-        qa_total_power[intervention_day] -= notfilplus_future_expire_power_to_transfer  # NO SDM when terminated
+        # simulate as if we terminate all power in one day, even though re-onboarding is linear
+        rbp_terminated_vec = np.zeros(forecast_lenght)
+        qap_terminated_vec = np.zeros(forecast_lenght)
+        rbp_terminated_vec[upgrade_day-1] = cc_future_expire_power_to_transfer_total
+        qap_terminated_vec[upgrade_day-1] = cc_future_expire_power_to_transfer_total
+
+        # simulate as if we terminate the power linearly
+        # rbp_reonboarded_day_k = cc_future_expire_power_to_transfer_total/cc_reonboard_time_days
+        # rbp_terminated_vec = np.zeros(forecast_lenght)
+        # qap_terminated_vec = np.zeros(forecast_lenght)
+        # for day_k in reonboard_days_vec:
+        #     rbp_terminated_vec[day_k-1] = rbp_reonboarded_day_k
+        #     qap_terminated_vec[day_k-1] = rbp_reonboarded_day_k  # NO SDM when terminated
+        
+        cum_rbp_terminated = rbp_terminated_vec.cumsum()
+        cum_qap_terminated = qap_terminated_vec.cumsum()
+        
+        rb_total_power -= cum_rbp_terminated
+        qa_total_power -= cum_qap_terminated
 
     # Build DataFrames
     rb_df = pd.DataFrame(
@@ -524,9 +566,7 @@ def build_full_power_stats_df(
     # Forecasted power
     forecast_power_df = rb_power_df[["total_raw_power_eib"]]
     forecast_power_df.loc[:, "total_qa_power_eib"] = qa_power_df["total_qa_power_eib"]
-    forecast_power_df.loc[:, "day_onboarded_qa_power_pib"] = qa_power_df[
-        "onboarded_power"
-    ]
+    forecast_power_df.loc[:, "day_onboarded_qa_power_pib"] = qa_power_df["onboarded_power"]
     forecast_power_df.loc[:, "day_renewed_qa_power_pib"] = qa_power_df["renewed_power"]
     forecast_start_date = current_date + datetime.timedelta(days=1)
     forecast_power_df.loc[:, "date"] = pd.date_range(
@@ -534,6 +574,8 @@ def build_full_power_stats_df(
     )
     forecast_power_df["date"] = forecast_power_df["date"].dt.date
 
+    forecast_power_df.loc[:, "total_rb_power_eib"] = rb_power_df["total_raw_power_eib"]
+    forecast_power_df.loc[:, "day_onboarded_rb_power_pib"] = rb_power_df["onboarded_power"]
     forecast_power_df.loc[:, "rb_sched_expire_power"] = rb_power_df['expire_scheduled_power']
     forecast_power_df.loc[:, "rb_sched_expire_power_known"] = rb_power_df['expire_scheduled_power_known']
     forecast_power_df.loc[:, "rb_sched_expire_power_model"] = rb_power_df['expire_scheduled_power_model']
