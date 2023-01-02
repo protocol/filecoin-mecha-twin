@@ -12,6 +12,8 @@ from .locking import (
 )
 from .power import scalar_or_vector_to_vector
 
+import scenario_generator.utils as u
+
 """
 There is still a small discrepancy between the actual locked FIL and forecasted
 locked FIL. We believe that it could be due to the following reasons:
@@ -35,6 +37,9 @@ def forecast_circulating_supply_df(
     mint_df: pd.DataFrame,
     known_scheduled_pledge_release_vec: np.array,
     lock_target: float = 0.3,
+    fil_plus_rate: Union[np.array, float] = None,
+    intervention_config: dict = None,
+    fpr_hist_info: tuple = None,
 ) -> pd.DataFrame:
     # we assume all stats started at main net launch, in 2020-10-15
     start_day = (start_date - datetime.date(2020, 10, 15)).days
@@ -54,6 +59,138 @@ def forecast_circulating_supply_df(
     sim_len = end_day - start_day
     renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, sim_len)
 
+    #########################################################################################################
+    # Setup for intervention
+    cs_tvec = np.asarray([start_date + datetime.timedelta(days=x) for x in range(sim_len)])
+
+    if intervention_config is not None:
+        intervention_type = intervention_config['type']
+        num_days_shock_behavior = intervention_config.get('num_days_shock_behavior', 360) 
+        cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 1)
+
+        upgrade_date = intervention_config['intervention_date']
+        sim_start_date = intervention_config['simulation_start_date']
+        # upgrade_day = (upgrade_date - sim_start_date).days
+        upgrade_day = (upgrade_date - start_date).days  # CS simulation starts from start_date, not sim_start_date
+        
+    else:
+        raise Exception("TODO")
+    if fil_plus_rate is None:
+        raise Exception("mechaFIL currently hardcoded for intervention - must supply FIL+ rate vector!")
+
+    df_tmp = initialise_circulating_supply_df(
+        start_date,
+        end_date,
+        circ_supply_zero,
+        locked_fil_zero,
+        burnt_fil_vec,
+        vest_df,
+        mint_df,
+    )
+    # run simulation loop to precompute metrics that need to change in the intervention timeperiod
+    # while this is horribly inefficient, its more bug-free, atleast to start with
+    current_day_idx = current_day - start_day
+    scheduled_pledge_release_vec = np.zeros(sim_len)
+
+    for day_idx in range(1, sim_len):
+        day_pledge_locked_vec = df_tmp["day_locked_pledge"].values
+        scheduled_pledge_release = get_day_schedule_pledge_release(
+            day_idx,
+            current_day_idx,
+            day_pledge_locked_vec,
+            known_scheduled_pledge_release_vec,
+            duration,
+        )
+        scheduled_pledge_release_vec[day_idx] = scheduled_pledge_release
+        pledge_delta, onboards_delta, renews_delta = compute_day_delta_pledge(
+            df_tmp["day_network_reward"].iloc[day_idx],
+            circ_supply,
+            df_tmp["day_onboarded_power_QAP"].iloc[day_idx],
+            df_tmp["day_renewed_power_QAP"].iloc[day_idx],
+            df_tmp["network_QAP"].iloc[day_idx],
+            df_tmp["network_baseline"].iloc[day_idx],
+            renewal_rate_vec[day_idx],
+            scheduled_pledge_release,
+            lock_target,
+        )
+        day_locked_pledge, day_renewed_pledge = compute_day_locked_pledge(
+            df_tmp["day_network_reward"].iloc[day_idx],
+            circ_supply,
+            df_tmp["day_onboarded_power_QAP"].iloc[day_idx],
+            df_tmp["day_renewed_power_QAP"].iloc[day_idx],
+            df_tmp["network_QAP"].iloc[day_idx],
+            df_tmp["network_baseline"].iloc[day_idx],
+            renewal_rate_vec[day_idx],
+            scheduled_pledge_release,
+            lock_target,
+        )
+        # Compute daily change in block rewards collateral
+        day_locked_rewards = compute_day_locked_rewards(
+            df_tmp["day_network_reward"].iloc[day_idx]
+        )
+        day_reward_release = compute_day_reward_release(
+            df_tmp["network_locked_reward"].iloc[day_idx - 1]
+        )
+        reward_delta = day_locked_rewards - day_reward_release
+        # Update dataframe
+        df_tmp["day_locked_pledge"].iloc[day_idx] = day_locked_pledge
+        df_tmp["day_renewed_pledge"].iloc[day_idx] = day_renewed_pledge
+        df_tmp["network_locked_pledge"].iloc[day_idx] = (
+            df_tmp["network_locked_pledge"].iloc[day_idx - 1] + pledge_delta
+        )
+        df_tmp["network_locked_reward"].iloc[day_idx] = (
+            df_tmp["network_locked_reward"].iloc[day_idx - 1] + reward_delta
+        )
+        df_tmp["network_locked"].iloc[day_idx] = (
+            df_tmp["network_locked"].iloc[day_idx - 1] + pledge_delta + reward_delta
+        )
+        # Update gas burnt
+        if df_tmp["network_gas_burn"].iloc[day_idx] == 0.0:
+            df_tmp["network_gas_burn"].iloc[day_idx] = (
+                df_tmp["network_gas_burn"].iloc[day_idx - 1] + daily_burnt_fil
+            )
+        # Find circulating supply balance and update
+        circ_supply = (
+            df_tmp["disbursed_reserve"].iloc[
+                day_idx
+            ]  # from initialise_circulating_supply_df
+            + df_tmp["cum_network_reward"].iloc[day_idx]  # from the minting_model
+            + df_tmp["total_vest"].iloc[day_idx]  # from vesting_model
+            - df_tmp["network_locked"].iloc[day_idx]  # from simulation loop
+            - df_tmp["network_gas_burn"].iloc[day_idx]  # comes from user inputs
+        )
+        df_tmp["circ_supply"].iloc[day_idx] = max(circ_supply, 0)
+
+    forecast_length = (end_date-current_date).days
+    if fpr_hist_info is None:
+        t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
+    else:
+        t_fpr_hist = fpr_hist_info[0]
+        fpr_hist = fpr_hist_info[1]
+    t_fpr_cur = [datetime.date(2022,12,1) + datetime.timedelta(days=x) for x in range(forecast_length)]
+    fpr_all = np.concatenate([fpr_hist, fil_plus_rate])
+    fpr_all_simindex_start = len(fpr_hist)
+
+    shock_days_vec = [upgrade_day + k for k in range(num_days_shock_behavior)]
+    reonboard_days_vec = [upgrade_day + k for k in range(cc_reonboard_time_days)]
+
+    t_input_vec = np.asarray([sim_start_date + datetime.timedelta(days=x) for x in range(forecast_length)])
+    t_input_intervention_start_ii = np.where(t_input_vec == upgrade_date)[0][0]
+    cs_offset_ii = np.where(cs_tvec == upgrade_date)[0][0]
+    tmp_duration = 365
+    cc_fil_locked_in_window_vec = np.zeros(num_days_shock_behavior)
+    for jj in range(num_days_shock_behavior):
+        jj_base = jj+t_input_intervention_start_ii
+        rr_jj = renewal_rate_vec[jj_base]
+
+        fpr_jj = jj_base+fpr_all_simindex_start-tmp_duration
+        fpr_at_time_of_onboard_and_renew = fpr_all[fpr_jj] if fpr_jj > 0 else 0.001
+        
+        cc_fil_locked_in_window_vec[jj] = scheduled_pledge_release_vec[jj+cs_offset_ii] * (1-fpr_at_time_of_onboard_and_renew)
+    cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_vec)
+    #########################################################################################################
+    
+
     # Simulation for loop
     current_day_idx = current_day - start_day
     for day_idx in range(1, sim_len):
@@ -66,7 +203,14 @@ def forecast_circulating_supply_df(
             known_scheduled_pledge_release_vec,
             duration,
         )
-        pledge_delta = compute_day_delta_pledge(
+        if intervention_type == 'cc_early_terminate_and_onboard' or intervention_type == 'cc_early_renewal':
+            if day_idx in shock_days_vec:
+                scheduled_pledge_release -= cc_fil_locked_in_window_vec[day_idx-cs_offset_ii]
+        if intervention_type == 'cc_early_renewal':
+            if day_idx == cs_offset_ii:
+                scheduled_pledge_release += cc_fil_locked_in_window_total
+        
+        pledge_delta, onboards_delta, renews_delta = compute_day_delta_pledge(
             df["day_network_reward"].iloc[day_idx],
             circ_supply,
             df["day_onboarded_power_QAP"].iloc[day_idx],
@@ -77,6 +221,12 @@ def forecast_circulating_supply_df(
             scheduled_pledge_release,
             lock_target,
         )
+        ###### DEBUGGING ######
+        df['scheduled_pledge_release'].iloc[day_idx] = scheduled_pledge_release
+        df['pledge_delta'].iloc[day_idx] = pledge_delta
+        df['onboards_delta'].iloc[day_idx] = onboards_delta
+        df['renews_delta'].iloc[day_idx] = renews_delta
+        #######################
         # Get total locked pledge (needed for future day_locked_pledge)
         day_locked_pledge, day_renewed_pledge = compute_day_locked_pledge(
             df["day_network_reward"].iloc[day_idx],
@@ -109,6 +259,10 @@ def forecast_circulating_supply_df(
         df["network_locked"].iloc[day_idx] = (
             df["network_locked"].iloc[day_idx - 1] + pledge_delta + reward_delta
         )
+        # if intervention_type == 'cc_early_terminate_and_onboard' or intervention_type == 'cc_early_renewal':
+        if intervention_type == 'cc_early_terminate_and_onboard':
+            if day_idx == cs_offset_ii:
+                df["network_locked"].iloc[day_idx] -= cc_fil_locked_in_window_total
         # Update gas burnt
         if df["network_gas_burn"].iloc[day_idx] == 0.0:
             df["network_gas_burn"].iloc[day_idx] = (
@@ -124,7 +278,12 @@ def forecast_circulating_supply_df(
             - df["network_locked"].iloc[day_idx]  # from simulation loop
             - df["network_gas_burn"].iloc[day_idx]  # comes from user inputs
         )
+        # if intervention_type == 'cc_early_terminate_and_onboard':
+        #     if day_idx == cs_offset_ii:
+        #         circ_supply += cc_fil_locked_in_window_total
+
         df["circ_supply"].iloc[day_idx] = max(circ_supply, 0)
+
     return df
 
 
@@ -156,6 +315,11 @@ def initialise_circulating_supply_df(
             "network_locked_reward": np.zeros(len_sim),
             "disbursed_reserve": np.ones(len_sim)
             * (17066618961773411890063046 * 10**-18),
+
+            "pledge_delta": np.zeros(len_sim),
+            "onboards_delta": np.zeros(len_sim),
+            "renews_delta": np.zeros(len_sim),
+            "scheduled_pledge_release": np.zeros(len_sim),
         }
     )
     df["date"] = df["date"].dt.date

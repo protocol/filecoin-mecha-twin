@@ -41,7 +41,7 @@ def compute_day_delta_pledge(
         scheduled_pledge_release,
         lock_target,
     )
-    return onboards_delta + renews_delta
+    return onboards_delta + renews_delta, onboards_delta, renews_delta
 
 
 def compute_day_locked_pledge(

@@ -215,17 +215,23 @@ def forecast_power_stats(
     duration_m: Callable = None,
     qap_method: str = 'tunable',  # can be set to tunable or basic
                                   # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
-    intervention_config: dict = None
+    intervention_config: dict = None,
+    fpr_hist_info: tuple = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     validate_qap_method(qap_method)
 
-    t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
+    if fpr_hist_info is None:
+        t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
+    else:
+        t_fpr_hist = fpr_hist_info[0]
+        fpr_hist = fpr_hist_info[1]
     t_fpr_cur = [datetime.date(2022,12,1) + datetime.timedelta(days=x) for x in range(forecast_lenght)]
     fpr_all = np.concatenate([fpr_hist, fil_plus_rate])
     fpr_all_simindex_start = len(fpr_hist)
     
     if intervention_config is not None:
         intervention_type = intervention_config['type']
+        num_days_shock_behavior = intervention_config.get('num_days_shock_behavior', 360) 
         cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 1)
 
         intervention_date = intervention_config['intervention_date']
@@ -249,10 +255,8 @@ def forecast_power_stats(
         rb_onboard_power, forecast_lenght
     )
 
-    num_days_shock_behavior = 360
     shock_days_vec = [upgrade_day + k for k in range(num_days_shock_behavior)]
     reonboard_days_vec = [upgrade_day + k for k in range(cc_reonboard_time_days)]
-    print(reonboard_days_vec)
     # inputs are RenewalRate, RB Onboarding, and FIL+ rate.  
     # Setup the time indices for each to align the times when arrays are sliced.
     t_input_vec = np.asarray([sim_start_date + datetime.timedelta(days=x) for x in range(forecast_lenght)])
