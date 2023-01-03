@@ -22,6 +22,7 @@ def compute_day_delta_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float = 0.3,
+    verbose: bool = False,
 ) -> float:
     onboards_delta = compute_new_pledge_for_added_power(
         day_network_reward,
@@ -40,6 +41,7 @@ def compute_day_delta_pledge(
         renewal_rate,
         scheduled_pledge_release,
         lock_target,
+        verbose=verbose
     )
     return onboards_delta + renews_delta, onboards_delta, renews_delta
 
@@ -54,6 +56,7 @@ def compute_day_locked_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float = 0.3,
+    verbose: bool = False
 ) -> float:
     # Total locked from new onboards
     onboards_locked = compute_new_pledge_for_added_power(
@@ -77,7 +80,12 @@ def compute_day_locked_pledge(
     renews_locked = max(original_pledge, new_pledge)
     # Total locked pledge
     locked = onboards_locked + renews_locked
-    return locked, renews_locked
+
+    if verbose:
+        print('onboards_locked=%0.02f original_pledge=%0.02f new_pledge=%0.02f total_locked=%0.02f' % 
+                (onboards_locked, original_pledge, new_pledge, locked))
+
+    return locked, onboards_locked, renews_locked
 
 
 def compute_renewals_delta_pledge(
@@ -89,6 +97,7 @@ def compute_renewals_delta_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float,
+    verbose: bool = False
 ) -> float:
     # Delta from sectors expiring
     expire_delta = -(1 - renewal_rate) * scheduled_pledge_release
@@ -103,8 +112,14 @@ def compute_renewals_delta_pledge(
         lock_target,
     )
     renew_delta = max(0.0, new_pledge - original_pledge)
+
     # Delta for all scheduled sectors
     delta = expire_delta + renew_delta
+
+    if verbose:
+        print('rr=%0.02f expire_delta=%0.02f renew_delta=%0.02f delta=%0.02f' % \
+                (renewal_rate, expire_delta, renew_delta, delta))
+    
     return delta
 
 

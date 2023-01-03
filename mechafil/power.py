@@ -302,11 +302,11 @@ def forecast_power_stats(
         fpr_future_expire_renewed_vec[jj] = fpr_future_expire_vec[jj] * rr_jj
         cc_future_expire_power_to_transfer_total += cc_future_expire_renewed_vec[jj]
 
-    print('cc future expire', np.sum(cc_future_expire_vec))
-    print('fpr future expire', np.sum(fpr_future_expire_vec))
-    print('[window] cc to expire that will be transferred', cc_future_expire_power_to_transfer_total, 
-           np.sum(cc_future_expire_renewed_vec))
-    print('[window] fpr to expire that will be renewed', np.sum(fpr_future_expire_renewed_vec))
+    # print('cc future expire', np.sum(cc_future_expire_vec))
+    # print('fpr future expire', np.sum(fpr_future_expire_vec))
+    # print('[window] cc to expire that will be transferred', cc_future_expire_power_to_transfer_total, 
+    #        np.sum(cc_future_expire_renewed_vec))
+    # print('[window] fpr to expire that will be renewed', np.sum(fpr_future_expire_renewed_vec))
     ########################################################################################################################
     
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
@@ -461,8 +461,8 @@ def forecast_power_stats(
             day_qa_renewed_power[day_i] += duration_m(duration)*cc_future_expire_power_to_transfer_total  # gets SDM when renewed
             # print('after-early-renewal[%d] | day_rb_renewed_power=%0.02f' % (day_i, day_rb_renewed_power[day_i], ))
 
-    print('total_rb_renewed_in_window=%0.02f total_rb_expired_removed=%0.02f' % \
-            (total_rb_renewed_in_window, total_rb_expired_in_window))
+    # print('total_rb_renewed_in_window=%0.02f total_rb_expired_removed=%0.02f' % \
+    #         (total_rb_renewed_in_window, total_rb_expired_in_window))
 
     # compute total powers
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
