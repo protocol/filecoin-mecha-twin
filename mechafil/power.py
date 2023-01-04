@@ -337,13 +337,8 @@ def forecast_power_stats(
         if intervention_type == 'cc_early_terminate_and_onboard' and day_i in reonboard_days_vec:
             rbp_to_reonboard = cc_future_expire_power_to_transfer_total/cc_reonboard_time_days
             # add to whatever was already scheduled to be onboarded
-            # print('before | day_rb_onboarded_power[%d]=%0.02f' % (day_i, day_rb_onboarded_power[day_i], ))
             day_rb_onboarded_power[day_i] += rbp_to_reonboard
             day_qa_onboarded_power[day_i] += (rbp_to_reonboard * duration_m(duration))  # get SDM when re-onboarding the CC sectors
-            # print('after | day_rb_onboarded_power[%d]=%0.02f' % (day_i, day_rb_onboarded_power[day_i], ))
-
-            # day_rb_onboarded_power[day_i] = rbp_to_reonboard
-            # day_qa_onboarded_power[day_i] = (rbp_to_reonboard * duration_m(duration))  # get SDM when re-onboarding the CC sectors
 
         # Raw-power stats
         rb_sched_expire_pwr_i, known_rb_se_power_i, model_rb_se_power_i = compute_day_se_power(
@@ -456,13 +451,8 @@ def forecast_power_stats(
             day_qa_scheduled_expire_power[day_i] += cc_future_expire_power_to_transfer_total  # no SDM when expiring
             
             # renew
-            # print('before-early-renewal[%d] | day_rb_renewed_power=%0.02f' % (day_i, day_rb_renewed_power[day_i], ))
             day_rb_renewed_power[day_i] += cc_future_expire_power_to_transfer_total
             day_qa_renewed_power[day_i] += duration_m(duration)*cc_future_expire_power_to_transfer_total  # gets SDM when renewed
-            # print('after-early-renewal[%d] | day_rb_renewed_power=%0.02f' % (day_i, day_rb_renewed_power[day_i], ))
-
-    # print('total_rb_renewed_in_window=%0.02f total_rb_expired_removed=%0.02f' % \
-    #         (total_rb_renewed_in_window, total_rb_expired_in_window))
 
     # compute total powers
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()

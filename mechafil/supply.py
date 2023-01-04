@@ -90,7 +90,7 @@ def forecast_circulating_supply_df(
         mint_df,
     )
     # run simulation loop to precompute metrics that need to change in the intervention timeperiod
-    # while this is horribly inefficient, its more bug-free, atleast to start with
+    # while this is horribly inefficient, its more bug-free - but look to change this in the future
     current_day_idx = current_day - start_day
     scheduled_pledge_release_vec = np.zeros(sim_len)
 
@@ -186,6 +186,8 @@ def forecast_circulating_supply_df(
     qap_renewed_during_window = np.zeros(num_days_shock_behavior)
     network_qap_byday_during_window = np.zeros(num_days_shock_behavior)
     pledge_renewed_power_window = np.zeros(num_days_shock_behavior)
+    day_network_reward_vec = np.zeros(num_days_shock_behavior)
+    cc_pct_at_time_of_onboard_and_renew_vec = np.zeros(num_days_shock_behavior)
     for jj in range(num_days_shock_behavior):
         jj_base = jj+t_input_intervention_start_ii
         rr_jj = renewal_rate_vec[jj_base]
@@ -206,12 +208,19 @@ def forecast_circulating_supply_df(
             df_day['network_baseline'],
             lock_target
         )
+        
+        day_network_reward_vec[jj] = df_day['day_network_reward']
+        cc_pct_at_time_of_onboard_and_renew_vec[jj] = (1-fpr_at_time_of_onboard_and_renew)
     # cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_vec)
     cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_renewal_vec)
+    termination_fee_in_FIL = np.mean(np.convolve(day_network_reward_vec*cc_pct_at_time_of_onboard_and_renew_vec, np.ones(90, dtype=int), 'valid'))
     #########################################################################################################
-    print('total_FIL_to_move', cc_fil_locked_in_window_total)
-    print('qap_renewed at upgrade_day', qap_renewed_during_window[0])
-    print('total FIL locked due to renew at upgrade_day', pledge_renewed_power_window[0])
+    # print('total_FIL_to_move', cc_fil_locked_in_window_total)
+    # print('qap_renewed at upgrade_day', qap_renewed_during_window[0])
+    # print('total FIL locked due to renew at upgrade_day', pledge_renewed_power_window[0])
+    # print('total_fil_reward_in_window', np.sum(day_network_reward_vec))
+    # print('total_fil_reward_in_window*cc', np.sum(day_network_reward_vec*cc_pct_at_time_of_onboard_and_renew_vec))
+    # print('termination_fee', termination_fee_in_FIL)
 
     # Simulation for loop
     current_day_idx = current_day - start_day
@@ -228,14 +237,7 @@ def forecast_circulating_supply_df(
         if intervention_type == 'cc_early_terminate_and_onboard' or intervention_type == 'cc_early_renewal':
             if day_idx in shock_days_vec:
                 scheduled_pledge_release -= cc_fil_locked_in_window_vec[day_idx-cs_offset_ii]
-        # if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
-        #     scheduled_pledge_release += (cc_fil_locked_in_window_total)
         
-        rr_in = renewal_rate_vec[day_idx]
-        verbose = False
-        if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
-            verbose = True
-            # rr_in = 1
         pledge_delta, onboards_delta, renews_delta = compute_day_delta_pledge(
             df["day_network_reward"].iloc[day_idx],
             circ_supply,
@@ -243,15 +245,14 @@ def forecast_circulating_supply_df(
             df["day_renewed_power_QAP"].iloc[day_idx],
             df["network_QAP"].iloc[day_idx],
             df["network_baseline"].iloc[day_idx],
-            rr_in,
+            renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target,
-            verbose=verbose
+            lock_target
         )
         if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
             pledge_delta -= cc_fil_locked_in_window_total
         
-        ###### DEBUGGING ######
+        ###### Helpful outputs for probing system ######
         df['scheduled_pledge_release'].iloc[day_idx] = scheduled_pledge_release
         df['pledge_delta'].iloc[day_idx] = pledge_delta
         df['onboards_delta'].iloc[day_idx] = onboards_delta
@@ -265,17 +266,10 @@ def forecast_circulating_supply_df(
             df["day_renewed_power_QAP"].iloc[day_idx],
             df["network_QAP"].iloc[day_idx],
             df["network_baseline"].iloc[day_idx],
-            rr_in,
+            renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target,
-            verbose=verbose
+            lock_target
         )
-        # if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
-        #     day_locked_pledge -= (cc_fil_locked_in_window_total)
-        # if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
-        #     print('loop', 'day_renewed_power_QAP', df["day_renewed_power_QAP"].iloc[day_idx], 
-        #           'onboards_delta', onboards_delta, 'renews_delta', renews_delta, 'pledge_delta', pledge_delta,
-                #   'day_renewed_pledge', day_renewed_pledge)
                 
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(
@@ -298,7 +292,6 @@ def forecast_circulating_supply_df(
         df["network_locked"].iloc[day_idx] = (
             df["network_locked"].iloc[day_idx - 1] + pledge_delta + reward_delta
         )
-        # if intervention_type == 'cc_early_terminate_and_onboard' or intervention_type == 'cc_early_renewal':
         if intervention_type == 'cc_early_terminate_and_onboard':
             if day_idx == cs_offset_ii:
                 df["network_locked"].iloc[day_idx] -= cc_fil_locked_in_window_total
@@ -307,6 +300,9 @@ def forecast_circulating_supply_df(
             df["network_gas_burn"].iloc[day_idx] = (
                 df["network_gas_burn"].iloc[day_idx - 1] + daily_burnt_fil
             )
+        if intervention_type == 'cc_early_terminate_and_onboard':
+            if day_idx == cs_offset_ii:
+                df["network_gas_burn"].iloc[day_idx] += termination_fee_in_FIL
         # Find circulating supply balance and update
         circ_supply = (
             df["disbursed_reserve"].iloc[
@@ -317,9 +313,6 @@ def forecast_circulating_supply_df(
             - df["network_locked"].iloc[day_idx]  # from simulation loop
             - df["network_gas_burn"].iloc[day_idx]  # comes from user inputs
         )
-        # if intervention_type == 'cc_early_terminate_and_onboard':
-        #     if day_idx == cs_offset_ii:
-        #         circ_supply += cc_fil_locked_in_window_total
 
         df["circ_supply"].iloc[day_idx] = max(circ_supply, 0)
 
