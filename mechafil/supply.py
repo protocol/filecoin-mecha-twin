@@ -70,11 +70,13 @@ def forecast_circulating_supply_df(
         intervention_type = intervention_config['type']
         num_days_shock_behavior = intervention_config.get('num_days_shock_behavior', 360) 
 
+        lock_target_update_date = intervention_config.get('lock_target_update_date', None)
+        lock_target_update_value = intervention_config.get('lock_target_update_value', 0.3)
+
         upgrade_date = intervention_config['intervention_date']
         sim_start_date = intervention_config['simulation_start_date']
         # upgrade_day = (upgrade_date - sim_start_date).days
         upgrade_day = (upgrade_date - start_date).days  # CS simulation starts from start_date, not sim_start_date
-        
     else:
         raise Exception("TODO")
     if fil_plus_rate is None:
@@ -94,7 +96,13 @@ def forecast_circulating_supply_df(
     current_day_idx = current_day - start_day
     scheduled_pledge_release_vec = np.zeros(sim_len)
 
+    lock_target_in = lock_target
     for day_idx in range(1, sim_len):
+        cur_date = start_date + datetime.timedelta(days=day_idx)
+        if lock_target_update_date is not None:
+            if cur_date == lock_target_update_date:
+                lock_target_in = lock_target_update_value
+
         day_pledge_locked_vec = df_tmp["day_locked_pledge"].values
         scheduled_pledge_release = get_day_schedule_pledge_release(
             day_idx,
@@ -113,7 +121,7 @@ def forecast_circulating_supply_df(
             df_tmp["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target,
+            lock_target_in,
         )
         day_locked_pledge, day_onboard_pledge, day_renewed_pledge = compute_day_locked_pledge(
             df_tmp["day_network_reward"].iloc[day_idx],
@@ -124,7 +132,7 @@ def forecast_circulating_supply_df(
             df_tmp["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target,
+            lock_target_in,
         )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(
@@ -224,7 +232,14 @@ def forecast_circulating_supply_df(
 
     # Simulation for loop
     current_day_idx = current_day - start_day
+    lock_target_in = lock_target
     for day_idx in range(1, sim_len):
+        cur_date = start_date + datetime.timedelta(days=day_idx)
+        if lock_target_update_date is not None:
+            if cur_date == lock_target_update_date:
+                lock_target_in = lock_target_update_value
+
+
         # Compute daily change in initial pledge collateral
         day_pledge_locked_vec = df["day_locked_pledge"].values
         scheduled_pledge_release = get_day_schedule_pledge_release(
@@ -247,7 +262,7 @@ def forecast_circulating_supply_df(
             df["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target
+            lock_target_in
         )
         if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
             pledge_delta -= cc_fil_locked_in_window_total
@@ -268,7 +283,7 @@ def forecast_circulating_supply_df(
             df["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target
+            lock_target_in
         )
                 
         # Compute daily change in block rewards collateral
