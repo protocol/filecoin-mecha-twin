@@ -80,21 +80,27 @@ def query_spacescope_sector_expirations(
     chunk_days: int = DEFAULT_SPACESCOPE_CHUNK_SIZE_IN_DAYS
 ) -> pd.DataFrame:
     # See: https://docs.spacescope.io/network_core/power/#request-url-4
-    url_template = "https://api.spacescope.io/v2/power/sectors_schedule_expiration?end_date=%s&start_date=%s"
-    scheduled_df = spacescope_query(start_date, end_date, url_template, chunk_days)
+    #  NOTE: this is a bit weird compared to the rest of the Spacescope API, where scheduled expirations
+    #  does not need a start/end date and returns the entire dataset.  For now, we use this and filter
+    #  but this may need to change in the future if Spacescope changes their API.
+    url = "https://api.spacescope.io/v2/power/sectors_schedule_expiration"
+    scheduled_df = spacescope_query_to_df(url)
     
     # Convert bytes to pebibytes
     scheduled_df["extended_rb"] = scheduled_df["extended_bytes"].astype(float) / PIB
     scheduled_df["expired_rb"] = scheduled_df["expired_bytes"].astype(float) / PIB
-    scheduled_df["open_rb"] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
+    # scheduled_df["open_rb"] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
     scheduled_df["extended_qa"] = scheduled_df["extended_bytes_qap"].astype(float) / PIB
     scheduled_df["expired_qa"] = scheduled_df["expired_bytes_qap"].astype(float) / PIB
-    scheduled_df["open_qa"] = (
-        scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
-    )
+    # scheduled_df["open_qa"] = (
+    #     scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
+    # )
 
     scheduled_df["extended_pledge"] = scheduled_df["extended_pledge"].astype(float)
     scheduled_df["expired_pledge"] = scheduled_df["expired_pledge"].astype(float)
+    
+    scheduled_df['schedule_expire_rb'] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
+    scheduled_df["schedule_expire_qa"] = scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
     scheduled_df["schedule_expire_pledge"] = scheduled_df["schedule_expire_pledge"].astype(float)
 
     # Total scheduled to expire, excluding terminated

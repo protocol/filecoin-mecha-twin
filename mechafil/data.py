@@ -90,6 +90,11 @@ def query_starboard_sector_expirations(
         + scheduled_df["expired_pledge"].astype(float)
         + scheduled_df["potential_expire_pledge"].astype(float)
     )
+
+    scheduled_df["schedule_expire_rb"] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
+    scheduled_df["schedule_expire_qa"] = scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
+    scheduled_df["schedule_expire_pledge"] = scheduled_df["schedule_expire_pledge"].astype(float)
+
     # Convert interest date to datetime
     scheduled_df["date"] = pd.to_datetime(scheduled_df["interest_date"])
     # Filter dates
