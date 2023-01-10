@@ -20,11 +20,10 @@ def get_historical_network_stats(
     stats_df = stats_df.merge(power_df, on="date", how="inner").merge(
         onboards_df, on="date", how="inner"
     )
-    rb_renewal_rate, day_renewed_qa_power = get_day_renewed_power_stats(
+    renewal_df = get_day_renewed_power_stats(
         start_date, current_date, end_date
     )
-    stats_df["rb_renewal_rate"] = rb_renewal_rate
-    stats_df["day_renewed_qa_power_pib"] = day_renewed_qa_power
+    stats_df = stats_df.merge(renewal_df, on='date', how='inner')
     return stats_df
 
 
@@ -52,13 +51,20 @@ def get_day_renewed_power_stats(
 ) -> Tuple[np.array, np.array]:
     scheduled_df = query_spacescope_sector_expirations(start_date, end_date)
     filter_scheduled_df = scheduled_df[
-        scheduled_df["date"] < pd.to_datetime(current_date, utc="UTC")
+        scheduled_df["date"] <= pd.to_datetime(current_date, utc="UTC")
     ]
     rb_renewal_rate = (
         filter_scheduled_df["extended_rb"] / filter_scheduled_df["total_rb"]
     ).values
     day_renewed_qa_power = filter_scheduled_df["extended_qa"].values
-    return rb_renewal_rate, day_renewed_qa_power
+    renewal_df = pd.DataFrame(
+        {
+            'date': pd.to_datetime(filter_scheduled_df['date']).dt.date,
+            'rb_renewal_rate': rb_renewal_rate,
+            'day_renewed_qa_power_pib': day_renewed_qa_power
+        }
+    )
+    return renewal_df
 
 
 def chunk_dates(start_date: datetime.date, 
@@ -168,50 +174,6 @@ def query_spacescope_supply_stats(
     return stats_df
 
 
-def get_storage_baseline_value(date: datetime.date) -> float:
-    # Get baseline values from Starboard API
-    bp_df = query_historical_baseline_power()
-    # Extract baseline value at date
-    init_baseline_bytes = bp_df[bp_df["date"] >= pd.to_datetime(date, utc="UTC")].iloc[
-        0, 1
-    ]
-    return init_baseline_bytes
-
-
-def get_cum_capped_rb_power(date: datetime.date) -> float:
-    # Query data sources and join
-    rbp_df = query_historical_rb_power()
-    bp_df = query_historical_baseline_power()
-    df = pd.merge(rbp_df, bp_df, on="date", how="inner")
-    # Compute cumulative capped RB power
-    df["capped_power"] = np.min(df[["baseline", "rb_power"]].values, axis=1)
-    df["cum_capped_power"] = df["capped_power"].cumsum()
-    date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
-    init_cum_capped_power = date_df["cum_capped_power"].iloc[0]
-    return init_cum_capped_power
-
-
-def get_cum_capped_qa_power(date: datetime.date) -> float:
-    # Query data sources and join
-    qap_df = query_historical_qa_power()
-    bp_df = query_historical_baseline_power()
-    df = pd.merge(qap_df, bp_df, on="date", how="inner")
-    # Compute cumulative capped RB power
-    df["capped_power"] = np.min(df[["baseline", "qa_power"]].values, axis=1)
-    df["cum_capped_power"] = df["capped_power"].cumsum()
-    date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
-    init_cum_capped_power = date_df["cum_capped_power"].iloc[0]
-    return init_cum_capped_power
-
-
-def get_vested_amount(date: datetime.date) -> float:
-    start_date = date - datetime.timedelta(days=1)
-    end_date = date + datetime.timedelta(days=1)
-    stats_df = query_spacescope_supply_stats(start_date, end_date)
-    date_stats = stats_df[stats_df["date"] == date]
-    return date_stats["vested_fil"].iloc[0]
-
-
 def spacescope_query_to_df(url):
     payload={}
     headers = {
@@ -313,6 +275,6 @@ def query_historical_qa_power(start_date: datetime.date = None,
         start_date, end_date, chunk_days=chunk_days
     )
     qap_df = historical_power_df[['date', 'total_raw_bytes_power']]
-    qap_df = qap_df.rename(columns={'total_qa_bytes_power': 'rb_power'})
+    qap_df = qap_df.rename(columns={'total_qa_bytes_power': 'qa_power'})
 
     return qap_df
