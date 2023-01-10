@@ -89,35 +89,28 @@ def query_spacescope_sector_expirations(
     # Convert bytes to pebibytes
     scheduled_df["extended_rb"] = scheduled_df["extended_bytes"].astype(float) / PIB
     scheduled_df["expired_rb"] = scheduled_df["expired_bytes"].astype(float) / PIB
-    # scheduled_df["open_rb"] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
+    scheduled_df["terminated_rb"] = scheduled_df["terminated_bytes"].astype(float) / PIB
+    scheduled_df['schedule_expire_rb'] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
+
     scheduled_df["extended_qa"] = scheduled_df["extended_bytes_qap"].astype(float) / PIB
     scheduled_df["expired_qa"] = scheduled_df["expired_bytes_qap"].astype(float) / PIB
-    # scheduled_df["open_qa"] = (
-    #     scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
-    # )
+    scheduled_df['terminated_qa'] = scheduled_df['terminated_bytes_qap'].astype(float) / PIB
+    scheduled_df["schedule_expire_qa"] = scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
 
     scheduled_df["extended_pledge"] = scheduled_df["extended_pledge"].astype(float)
     scheduled_df["expired_pledge"] = scheduled_df["expired_pledge"].astype(float)
-    
-    scheduled_df['schedule_expire_rb'] = scheduled_df["schedule_expire_bytes"].astype(float) / PIB
-    scheduled_df["schedule_expire_qa"] = scheduled_df["schedule_expire_bytes_qap"].astype(float) / PIB
+    scheduled_df["terminated_pledge"] = scheduled_df["terminated_pledge"].astype(float)
     scheduled_df["schedule_expire_pledge"] = scheduled_df["schedule_expire_pledge"].astype(float)
 
-    # Total scheduled to expire, excluding terminated
+    # Total scheduled to expire, excluding terminated. Exclude terminated because 
     scheduled_df["total_rb"] = (
-        scheduled_df["extended_rb"]
-        + scheduled_df["expired_rb"]
-        # + scheduled_df["open_rb"]
+        scheduled_df["schedule_expire_rb"] - scheduled_df['terminated_rb']
     )
     scheduled_df["total_qa"] = (
-        scheduled_df["extended_qa"]
-        + scheduled_df["expired_qa"]
-        # + scheduled_df["open_qa"]
+        scheduled_df["schedule_expire_qa"] - scheduled_df['terminated_qa']
     )
     scheduled_df["total_pledge"] = (
-        scheduled_df["extended_pledge"]
-        + scheduled_df["expired_pledge"]
-        # + scheduled_df["schedule_expire_pledge"].astype(float)
+        scheduled_df["schedule_expire_pledge"] - scheduled_df['terminated_pledge']
     )
     # Convert interest date to datetime
     scheduled_df["date"] = pd.to_datetime(scheduled_df["interest_date"])
