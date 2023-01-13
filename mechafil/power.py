@@ -76,12 +76,18 @@ def forecast_qa_daily_onboardings(
 # --------------------------------------------------------------------------------------
 #  Renewals
 # --------------------------------------------------------------------------------------
+# def compute_basic_day_renewed_power(
+#     day_i: int,
+#     day_scheduled_expire_power_vec: np.array,
+#     renewal_rate_vec: np.array,
+# ) -> float:
+#     day_renewed_power = renewal_rate_vec[day_i] * day_scheduled_expire_power_vec[day_i]
+#     return day_renewed_power
 def compute_basic_day_renewed_power(
-    day_i: int,
-    day_scheduled_expire_power_vec: np.array,
-    renewal_rate_vec: np.array,
+    day_scheduled_expire_power: float,
+    renewal_rate: float,
 ) -> float:
-    day_renewed_power = renewal_rate_vec[day_i] * day_scheduled_expire_power_vec[day_i]
+    day_renewed_power = renewal_rate * day_scheduled_expire_power
     return day_renewed_power
 
 
@@ -130,7 +136,7 @@ def compute_day_se_power(
         model_day_se_power = 0.0
     # Total scheduled expirations
     day_se_power = known_day_se_power + model_day_se_power
-    return day_se_power
+    return day_se_power, known_day_se_power, model_day_se_power
 
 
 # --------------------------------------------------------------------------------------
@@ -146,6 +152,8 @@ def forecast_power_stats(
     fil_plus_rate: Union[np.array, float],
     duration: int,
     forecast_lenght: int,
+    rb_known_scheduled_expire_full_vec: np.array = None,
+    qa_known_scheduled_expire_full_vec: np.array = None,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
     qap_method: str = 'tunable'  # can be set to tunable or basic
@@ -176,13 +184,26 @@ def forecast_power_stats(
     total_qa_onboarded_power = day_qa_onboarded_power.cumsum()
     # Initialize scheduled expirations and renewals
     day_rb_scheduled_expire_power = np.zeros(forecast_lenght)
+    day_rb_scheduled_expire_power = np.zeros(forecast_lenght)
     day_rb_renewed_power = np.zeros(forecast_lenght)
     day_qa_scheduled_expire_power = np.zeros(forecast_lenght)
     day_qa_renewed_power = np.zeros(forecast_lenght)
+
+    total_rb_scheduled_expire_power = np.zeros(forecast_lenght)
+    total_rb_renewed_power = np.zeros(forecast_lenght)
+    total_qa_scheduled_expire_power = np.zeros(forecast_lenght)
+    total_qa_renewed_power = np.zeros(forecast_lenght)
+
+    # debugging
+    day_rb_scheduled_expire_known_power = np.zeros(forecast_lenght)
+    day_rb_scheduled_expire_modeled_power = np.zeros(forecast_lenght)
+    day_qa_scheduled_expire_known_power = np.zeros(forecast_lenght)
+    day_qa_scheduled_expire_modeled_power = np.zeros(forecast_lenght)
+
     # Run loop to forecast daily scheduled expirations and renewals
     for day_i in range(forecast_lenght):
         # Raw-power stats
-        day_rb_scheduled_expire_power[day_i] = compute_day_se_power(
+        rb_day_se_power, rb_known_day_se_power, rb_model_day_se_power = compute_day_se_power(
             day_i,
             rb_known_scheduled_expire_vec,
             day_rb_onboarded_power,
@@ -190,17 +211,40 @@ def forecast_power_stats(
             duration,
         )
         day_rb_renewed_power[day_i] = compute_basic_day_renewed_power(
-            day_i, day_rb_scheduled_expire_power, renewal_rate_vec
+            rb_day_se_power, renewal_rate_vec[day_i]
         )
+        if rb_known_scheduled_expire_full_vec is not None:
+            rb_day_se_power, rb_known_day_se_power, rb_model_day_se_power = compute_day_se_power(
+                day_i,
+                rb_known_scheduled_expire_full_vec,
+                day_rb_onboarded_power,
+                day_rb_renewed_power,
+                duration,
+            )
+        day_rb_scheduled_expire_power[day_i] = rb_day_se_power
+        day_rb_scheduled_expire_known_power[day_i] = rb_known_day_se_power
+        day_rb_scheduled_expire_modeled_power[day_i] = rb_model_day_se_power
+
+        # compute running sum of total expired & renewed powers for RB
+        prev_total_rb_scheduled_expire_power = total_rb_scheduled_expire_power[day_i-1] if day_i > 0 else 0
+        prev_total_rb_renewed_power = total_rb_renewed_power[day_i-1] if day_i > 0 else 0
+        total_rb_scheduled_expire_power[day_i] = prev_total_rb_scheduled_expire_power + day_rb_scheduled_expire_power[day_i]
+        total_rb_renewed_power[day_i] = prev_total_rb_renewed_power + day_rb_renewed_power[day_i]
+        # correct for extreme scenarios, which can include extremely low renewal rates.  This combined with
+        # a fixed duration can lead to expired power > total onboarded power, which cannot happen in reality.
+        excess_rb_expire = total_rb_scheduled_expire_power[day_i] - (rb_power_zero + total_rb_onboarded_power[day_i] + total_rb_renewed_power[day_i])
+        # if excess_rb_expire > 0:
+        #     day_rb_scheduled_expire_power[day_i] -= excess_rb_expire
+        #     total_rb_scheduled_expire_power[day_i] -= excess_rb_expire
+
         # Quality-adjusted stats
-        day_qa_scheduled_expire_power[day_i] = compute_day_se_power(
+        qa_day_se_power, qa_known_day_se_power, qa_model_day_se_power = compute_day_se_power(
             day_i,
             qa_known_scheduled_expire_vec,
             day_qa_onboarded_power,
             day_qa_renewed_power,
             duration,
         )
-        
         # see https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view for more details
         if qap_method == 'tunable':
             day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
@@ -214,13 +258,42 @@ def forecast_power_stats(
             )
         elif qap_method == 'basic':
             day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
-                day_i, day_qa_scheduled_expire_power, renewal_rate_vec
+                qa_day_se_power, renewal_rate_vec[day_i]
             )
+        if qa_known_scheduled_expire_full_vec is not None:
+            qa_day_se_power, qa_known_day_se_power, qa_model_day_se_power = compute_day_se_power(
+                day_i,
+                qa_known_scheduled_expire_full_vec,
+                day_rb_onboarded_power,
+                day_rb_renewed_power,
+                duration,
+            )
+        day_qa_scheduled_expire_power[day_i] = qa_day_se_power
+        day_qa_scheduled_expire_known_power[day_i] = qa_known_day_se_power
+        day_qa_scheduled_expire_modeled_power[day_i] = qa_model_day_se_power
+        
+
+        # # compute running sum of total expired & renewed powers for RB
+        # #  NOTE: this can be done w/ a cumsum operation since we think that fixing RB should fix QA power automatically
+        prev_total_qa_scheduled_expire_power = total_qa_scheduled_expire_power[day_i-1] if day_i > 0 else 0
+        prev_total_qa_renewed_power = total_qa_renewed_power[day_i-1] if day_i > 0 else 0
+        total_qa_scheduled_expire_power[day_i] = prev_total_qa_scheduled_expire_power + day_qa_scheduled_expire_power[day_i]
+        total_qa_renewed_power[day_i] = prev_total_qa_renewed_power + day_qa_renewed_power[day_i]
+        # if excess_rb_expire > 0:
+        #     # expire extra QA power such that total QA power = 0, because this case means that
+        #     # RB power is currently at zero
+        #     # extra_qa_expire = (qa_power_zero + total_qa_onboarded_power[day_i] + total_qa_renewed_power[day_i]) - total_qa_scheduled_expire_power[day_i]
+        #     total_qa_before_expire = qa_power_zero + total_qa_onboarded_power[day_i] + total_qa_renewed_power[day_i]
+        #     day_qa_scheduled_expire_power[day_i] -= total_qa_before_expire
+        #     total_qa_scheduled_expire_power[day_i] = total_qa_before_expire
+
+        
     # Compute total scheduled expirations and renewals
-    total_rb_scheduled_expire_power = day_rb_scheduled_expire_power.cumsum()
-    total_rb_renewed_power = day_rb_renewed_power.cumsum()
-    total_qa_scheduled_expire_power = day_qa_scheduled_expire_power.cumsum()
-    total_qa_renewed_power = day_qa_renewed_power.cumsum()
+    # total_rb_scheduled_expire_power = day_rb_scheduled_expire_power.cumsum()
+    # total_rb_renewed_power = day_rb_renewed_power.cumsum()
+    # total_qa_scheduled_expire_power = day_qa_scheduled_expire_power.cumsum()
+    # total_qa_renewed_power = day_qa_renewed_power.cumsum()
+
     # Total RB power
     rb_power_zero_vec = np.ones(forecast_lenght) * rb_power_zero
     rb_total_power = (
@@ -238,12 +311,15 @@ def forecast_power_stats(
         + total_qa_renewed_power
     )
     # Build DataFrames
+
     rb_df = pd.DataFrame(
         {
             "forecasting_step": np.arange(forecast_lenght),
             "onboarded_power": day_rb_onboarded_power,
             "cum_onboarded_power": total_rb_onboarded_power,
             "expire_scheduled_power": day_rb_scheduled_expire_power,
+            "expire_scheduled_known_power": day_rb_scheduled_expire_known_power,
+            "expire_scheduled_modeled_power": day_rb_scheduled_expire_modeled_power,
             "cum_expire_scheduled_power": total_rb_scheduled_expire_power,
             "renewed_power": day_rb_renewed_power,
             "cum_renewed_power": total_rb_renewed_power,
