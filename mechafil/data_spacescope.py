@@ -83,7 +83,6 @@ def chunk_dates(start_date: datetime.date,
 def query_spacescope_sector_expirations(
     start_date: datetime.date, 
     end_date: datetime.date,
-    chunk_days: int = DEFAULT_SPACESCOPE_CHUNK_SIZE_IN_DAYS
 ) -> pd.DataFrame:
     # See: https://docs.spacescope.io/network_core/power/#request-url-4
     #  NOTE: this is a bit weird compared to the rest of the Spacescope API, where scheduled expirations
