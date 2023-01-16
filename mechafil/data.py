@@ -6,6 +6,13 @@ from typing import Tuple
 from . import data_spacescope, data_starboard
 DEFAULT_DATA_BACKEND = 'spacescope'
 
+spacescope_obj = None
+def setup_spacescope_obj(auth_config=None):
+    global spacescope_obj
+    spacescope_obj = data_spacescope.SpacescopeDataConnection(auth_config)
+setup_spacescope_obj()  # run it to default the auth-key.  User can override
+                        # by calling setup_spacescope_obj with a different config provided
+
 def get_historical_network_stats(
     start_date: datetime.date, 
     current_date: datetime.date, 
@@ -13,12 +20,11 @@ def get_historical_network_stats(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.get_historical_network_stats(start_date, current_date, end_date)
+        return spacescope_obj.get_historical_network_stats(start_date, current_date, end_date)
     elif data_backend.lower() == 'starboard':
         return data_starboard.get_historical_network_stats(start_date, current_date, end_date)
     else:
         raise ValueError("Data Backend: %s not supported!" % (data_backend,))
-
 
 def get_sector_expiration_stats(
     start_date: datetime.date,
@@ -27,7 +33,7 @@ def get_sector_expiration_stats(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.get_sector_expiration_stats(start_date, current_date, end_date)
+        return spacescope_obj.get_sector_expiration_stats(start_date, current_date, end_date)
     elif data_backend.lower() == 'starboard':
         return data_starboard.get_sector_expiration_stats(start_date, current_date, end_date)
     else:
@@ -40,7 +46,7 @@ def get_day_renewed_power_stats(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> Tuple[np.array, np.array]:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.get_day_renewed_power_stats(start_date, current_date, end_date)
+        return spacescope_obj.get_day_renewed_power_stats(start_date, current_date, end_date)
     elif data_backend.lower() == 'starboard':
         return data_starboard.get_day_renewed_power_stats(start_date, current_date, end_date)
     else:
@@ -52,7 +58,7 @@ def query_sector_expirations(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.query_spacescope_sector_expirations(start_date, end_date)
+        return spacescope_obj.query_spacescope_sector_expirations(start_date, end_date)
     elif data_backend.lower() == 'starboard':
         return data_starboard.query_starboard_sector_expirations(start_date, end_date)
     else:
@@ -65,7 +71,7 @@ def query_supply_stats(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.query_spacescope_supply_stats(start_date, end_date)
+        return spacescope_obj.query_spacescope_supply_stats(start_date, end_date)
     elif data_backend.lower() == 'starboard':
         return data_starboard.query_starboard_supply_stats(start_date, end_date)
     else:
@@ -78,9 +84,48 @@ def query_power_stats(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.query_spacescope_power_stats(start_date, end_date)
+        return spacescope_obj.query_spacescope_power_stats(start_date, end_date)
     elif data_backend.lower() == 'starboard':
         return data_starboard.query_starboard_power_stats(start_date, end_date)
+    else:
+        raise ValueError("Data Backend: %s not supported!" % (data_backend,))
+
+
+def query_daily_power_onboarded(
+    start_date: datetime.date,
+    end_date: datetime.date,
+    data_backend: str = DEFAULT_DATA_BACKEND
+) -> pd.DataFrame:
+    if data_backend.lower() == 'spacescope':
+        return spacescope_obj.query_spacescope_daily_power_onboarded(start_date, end_date)
+    elif data_backend.lower() == 'starboard':
+        return data_starboard.query_starboard_daily_power_onboarded(start_date, end_date)
+    else:
+        raise ValueError("Data Backend: %s not supported!" % (data_backend,))
+
+
+def query_supply_stats(
+    start_date: datetime.date,
+    end_date: datetime.date,
+    data_backend: str = DEFAULT_DATA_BACKEND
+) -> pd.DataFrame:
+    if data_backend.lower() == 'spacescope':
+        return spacescope_obj.query_spacescope_supply_stats(start_date, end_date)
+    elif data_backend.lower() == 'starboard':
+        return data_starboard.query_starboard_supply_stats(start_date, end_date)
+    else:
+        raise ValueError("Data Backend: %s not supported!" % (data_backend,))
+
+
+def query_sector_expirations(
+start_date: datetime.date,
+    end_date: datetime.date,
+    data_backend: str = DEFAULT_DATA_BACKEND
+) -> pd.DataFrame:
+    if data_backend.lower() == 'spacescope':
+        return spacescope_obj.query_spacescope_sector_expirations(start_date, end_date)
+    elif data_backend.lower() == 'starboard':
+        return data_starboard.query_starboard_sector_expirations(start_date, end_date)
     else:
         raise ValueError("Data Backend: %s not supported!" % (data_backend,))
     
@@ -145,7 +190,7 @@ def query_historical_baseline_power(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.query_historical_baseline_power()
+        return spacescope_obj.query_historical_baseline_power()
     elif data_backend.lower() == 'starboard':
         return data_starboard.query_historical_baseline_power()
     else:
@@ -156,7 +201,7 @@ def query_historical_rb_power(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.query_historical_rb_power()
+        return spacescope_obj.query_historical_rb_power()
     elif data_backend.lower() == 'starboard':
         return data_starboard.query_historical_rb_power()
     else:
@@ -167,7 +212,7 @@ def query_historical_qa_power(
     data_backend: str = DEFAULT_DATA_BACKEND
 ) -> pd.DataFrame:
     if data_backend.lower() == 'spacescope':
-        return data_spacescope.query_historical_qa_power()
+        return spacescope_obj.query_historical_qa_power()
     elif data_backend.lower() == 'starboard':
         return data_starboard.query_historical_qa_power()
     else:
