@@ -86,7 +86,7 @@ def run_simple_sim(
     forecast_renewal_rate_vec = scalar_or_vector_to_vector(
         renewal_rate, forecast_length
     )
-    past_renewal_rate_vec = fil_stats_df["rb_renewal_rate"].values
+    past_renewal_rate_vec = fil_stats_df["rb_renewal_rate"].values[:-1]
     renewal_rate_vec = np.concatenate(
         [past_renewal_rate_vec, forecast_renewal_rate_vec]
     )
