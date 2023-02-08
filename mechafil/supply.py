@@ -174,11 +174,12 @@ def forecast_circulating_supply_df(
 
     forecast_length = (end_date-current_date).days
     if fpr_hist_info is None:
-        t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
+        #t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
+        #_, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
+        raise ValueError('fpr_hist_info must be provided')
     else:
-        t_fpr_hist = fpr_hist_info[0]
+        t_fpr_hist = fpr_hist_info[0]  # unused but keep for API
         fpr_hist = fpr_hist_info[1]
-    t_fpr_cur = [datetime.date(2022,12,1) + datetime.timedelta(days=x) for x in range(forecast_length)]
     fpr_all = np.concatenate([fpr_hist, fil_plus_rate])
     fpr_all_simindex_start = len(fpr_hist)
 
