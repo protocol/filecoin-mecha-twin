@@ -236,7 +236,8 @@ def forecast_circulating_supply_df(
         cc_pct_at_time_of_onboard_and_renew_vec[jj] = (1-fpr_at_time_of_onboard_and_renew)
     # cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_vec)
     cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_renewal_vec)
-    termination_fee_in_FIL = np.mean(np.convolve(day_network_reward_vec*cc_pct_at_time_of_onboard_and_renew_vec, np.ones(90, dtype=int), 'valid'))
+    termination_fee_days=140
+    termination_fee_in_FIL = np.mean(np.convolve(day_network_reward_vec*cc_pct_at_time_of_onboard_and_renew_vec, np.ones(termination_fee_days, dtype=int), 'valid'))
     
     # Simulation for loop
 
@@ -332,7 +333,8 @@ def forecast_circulating_supply_df(
             df["network_gas_burn"].iloc[day_idx] = (
                 df["network_gas_burn"].iloc[day_idx - 1] + daily_burnt_fil
             )
-        if intervention_type == 'cc_early_terminate_and_onboard':
+        # if intervention_type == 'cc_early_terminate_and_onboard':
+        if intervention_type == 'cc_early_terminate_and_onboard' or intervention_type == 'cc_early_renewal':
             if day_idx == cs_offset_ii:
                 df["network_gas_burn"].iloc[day_idx] += termination_fee_in_FIL
         # Find circulating supply balance and update
