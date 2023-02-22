@@ -7,9 +7,9 @@ from . import data_spacescope, data_starboard
 DEFAULT_DATA_BACKEND = 'spacescope'
 
 spacescope_obj = None
-def setup_spacescope_obj(auth_config=None):
+def setup_spacescope_obj(auth_config=None, token=None):
     global spacescope_obj
-    spacescope_obj = data_spacescope.SpacescopeDataConnection(auth_config)
+    spacescope_obj = data_spacescope.SpacescopeDataConnection(auth_config, token)
 setup_spacescope_obj()  # run it to default the auth-key.  User can override
                         # by calling setup_spacescope_obj with a different config provided
 
