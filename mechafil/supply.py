@@ -236,7 +236,7 @@ def forecast_circulating_supply_df(
         cc_pct_at_time_of_onboard_and_renew_vec[jj] = (1-fpr_at_time_of_onboard_and_renew)
     # cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_vec)
     cc_fil_locked_in_window_total = np.sum(cc_fil_locked_in_window_renewal_vec)
-    termination_fee_days=140
+    termination_fee_days=90
     termination_fee_in_FIL = np.mean(np.convolve(day_network_reward_vec*cc_pct_at_time_of_onboard_and_renew_vec, np.ones(termination_fee_days, dtype=int), 'valid'))
     
     # Simulation for loop
