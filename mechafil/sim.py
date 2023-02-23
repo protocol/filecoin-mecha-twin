@@ -23,8 +23,8 @@ def run_simple_sim(
     rb_onboard_power: Union[np.array, float],
     fil_plus_rate: Union[np.array, float],
     duration: int,
-    qap_method: str = 'tunable' # can be set to tunable or basic
-                                # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    qap_method: str = 'basic' # can be set to tunable or basic
+                              # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> pd.DataFrame:
     validate_qap_method(qap_method)
 
