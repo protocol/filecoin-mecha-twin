@@ -38,8 +38,19 @@ Alternatively, this package can be installed from source by cloning this reposit
 python setup.py install
 ```
 
-## Usage
+## Setup for Data Access
+`mechaFIL` uses historical data from Spacescope to provide Filecoin network econometric forecasts. Spacescope requires users to register for a unique token in order to request the historical data. Thus, each user of `mechaFIL` needs to register for a unique token to enable data access - this is a prerequisite to use `mechaFIL`.  
 
+### Steps:
+1. Follow the instructions [here](https://spacescope.io/sign/up/email) to get your own unique bearer token for data access.
+2. Store your token in a json configuration file with the key `auth_key`.  An example is:
+```json
+{
+    "auth_key": "Bearer ghp_xJtTSVcNRJINLWMmfDangcIFCjqPUNZenoVe"
+}
+```
+
+## Usage
 There is a high-level function that can be used to run a forecast/simulation of circulating supply and its components. First you need to import the relevant packages:
 
 ```python
@@ -64,13 +75,16 @@ rb_onboard_power = 12.0
 fil_plus_rate = 0.098
 # Sector duration of newly onboarding sectors
 duration = 360
+# Pointer to Authentication Token
+auth_config = "<UPDATE ME>"
 # Method of computing QAP
-qap_method = 'tunable'
+qap_method = 'basic'
 ```
 
 A few important notes regarding the inputs:
 * Due to data availability, the start date cannot be earlier than 2021-03-15.
 * The current date needs to be at least 2 days after the start date.
+* The current date needs to be at least 1 day before the actual current date. i.e. if you are running the simulation on 2023-01-15, then the maximum current date that is supported is 2023-01-14.
 * The parameters `renewal_rate`, `rb_onboard_power` and `fil_plus_rate` can be a single number or a vector of numbers. If they are a number, the model assumes that number as a constant throughout the simulation. If a vector is provided, then the vector needs to have the same size as the simulation length. The vector option gives the user the most flexibility since they can apply different constants throughout the simulation.
 * The optional parameter `qap_method` determines how network QAP will be computed. Two approaches are provided in the library, which we term `basic` and `tunable`. Setting this value to `tunable` will enable QAP to be computed with tunable sector duration multipliers, but note that this is an approximation. The other method is `basic` which does not support sector duration multipliers. See [here](https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view) for more details.
 
@@ -84,12 +98,21 @@ cil_df = mechafil.run_simple_sim(start_date,
     rb_onboard_power,
     fil_plus_rate,
     duration,
+    auth_config,
     qap_method='tunable')
 
 cil_df.head()
 ```
 
 You can also run part of the simulation separately. To see more examples, check the available [notebooks](https://github.com/protocol/filecoin-mecha-twin/tree/main/notebooks).
+
+## Note for Developers
+If you use `mechaFIL` in expert mode (i.e. don't use `run_simple_sim`) directly, then you will need to ensure that you setup your data access properly by running the following code
+```python
+import mechafil.data as mecha_data
+path_to_auth_cfg="<UPDATE ME>"
+mecha_data.setup_spacecope(path_to_auth_cfg)
+```
 
 ## References
 

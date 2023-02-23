@@ -16,20 +16,17 @@ DEFAULT_AUTH_CONFIG = os.path.join(os.path.dirname(__file__), 'cfg', 'spacescope
 class SpacescopeDataConnection:
     auth_token = ""
 
-    def __init__(self, auth_config=None, token=None):
-        if auth_config is not None and token is not None:
-            raise ValueError("Cannot provide both auth_config and token")
-        
-        if auth_config is None and token is None:
-            with open(DEFAULT_AUTH_CONFIG, 'r') as f:
-                default_config = json.load(f)
-                SpacescopeDataConnection.auth_token = default_config['auth_key']
-        elif token is not None:
-            SpacescopeDataConnection.auth_token = token
+    def __init__(self, auth_config_or_token: str):
+        if os.path.isfile(auth_config_or_token):
+            # assume it is a JSON config file with key: auth_key
+            try:
+                with open(auth_config_or_token, 'r') as f:
+                    config = json.load(f)
+                    SpacescopeDataConnection.auth_token = config['auth_key']
+            except:
+                raise ValueError("Invalid auth config file: %s" % (auth_config_or_token,))
         else:
-            with open(auth_config, 'r') as f:
-                config = json.load(f)
-                SpacescopeDataConnection.auth_token = config['auth_key']
+            SpacescopeDataConnection.auth_token = auth_config_or_token
 
     @classmethod
     def spacescope_query_to_df(cls, url):
