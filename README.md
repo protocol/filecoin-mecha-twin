@@ -104,6 +104,8 @@ cil_df = mechafil.run_simple_sim(start_date,
 cil_df.head()
 ```
 
+Please check [this](https://colab.research.google.com/drive/1qaLM2Fm27kQ07jIGBPdkdoTvo9-YAAtq?usp=sharing) Google Colab notebook for a complete example.
+
 You can also run part of the simulation separately. To see more examples, check the available [notebooks](https://github.com/protocol/filecoin-mecha-twin/tree/main/notebooks).
 
 ## Note for Developers
