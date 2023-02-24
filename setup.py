@@ -16,7 +16,6 @@ setuptools.setup(
         "Source": "https://github.com/protocol/filecoin-mecha-twin",
     },
     packages=['mechafil'],
-    package_data={'mechafil': ['cfg/spacescope_auth.json']},
     install_requires=["numpy>=1.23.1", "pandas>=1.4.3", "requests>=2.28.1"],
     python_requires=">=3.8",
     classifiers=[
