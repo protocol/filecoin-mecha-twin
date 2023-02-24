@@ -1,9 +1,11 @@
+import os
+
 import pandas as pd
 import numpy as np
 import datetime
 from typing import Union
 
-from .data import get_historical_network_stats, get_sector_expiration_stats
+from .data import get_historical_network_stats, get_sector_expiration_stats, setup_spacescope
 from .power import (
     forecast_power_stats,
     build_full_power_stats_df,
@@ -15,6 +17,9 @@ from .supply import forecast_circulating_supply_df
 
 from .utils import validate_qap_method
 
+def setup_data_access(bearer_token_or_cfg: str):
+    setup_spacescope(bearer_token_or_cfg)
+
 def run_simple_sim(
     start_date: datetime.date,
     current_date: datetime.date,
@@ -23,10 +28,12 @@ def run_simple_sim(
     rb_onboard_power: Union[np.array, float],
     fil_plus_rate: Union[np.array, float],
     duration: int,
-    qap_method: str = 'tunable' # can be set to tunable or basic
-                                # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    bearer_token_or_cfg: str,
+    qap_method: str = 'basic' # can be set to tunable or basic
+                              # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> pd.DataFrame:
     validate_qap_method(qap_method)
+    setup_data_access(bearer_token_or_cfg)
 
     end_date = current_date + datetime.timedelta(days=forecast_length)
     # Get sector scheduled expirations
