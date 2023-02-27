@@ -77,9 +77,8 @@ def forecast_circulating_supply_df(
         upgrade_date = intervention_config['intervention_date']
         sim_start_date = intervention_config['simulation_start_date']
 
-        consensus_pledge_method = intervention_config.get('consensus_pledge_method', 'circulating_supply').lower()
-        if consensus_pledge_method != 'circulating_supply' and consensus_pledge_method != 'available_supply':
-            raise Exception("Only circulating_supply and available_supply are supported for consensus_pledge_method")
+        consensus_pledge_method_before_intervention = intervention_config.get('consensus_pledge_method_before_intervention', 'circulating_supply').lower()
+        consensus_pledge_method_after_intervention = intervention_config.get('consensus_pledge_method_after_intervention', 'circulating_supply').lower()
 
         # upgrade_day = (upgrade_date - sim_start_date).days
         upgrade_day = (upgrade_date - start_date).days  # CS simulation starts from start_date, not sim_start_date
@@ -87,7 +86,13 @@ def forecast_circulating_supply_df(
         raise Exception("TODO")
     if fil_plus_rate is None:
         raise Exception("mechaFIL currently hardcoded for intervention - must supply FIL+ rate vector!")
-    def compute_pledge_base(cs, locked):
+    
+    def compute_pledge_base(cs, locked, day_in):
+        if day_in > upgrade_day:
+            consensus_pledge_method = consensus_pledge_method_after_intervention
+        else:
+            consensus_pledge_method = consensus_pledge_method_before_intervention
+        
         if consensus_pledge_method == 'circulating_supply':
             return cs
         elif consensus_pledge_method == 'available_supply':
@@ -109,7 +114,7 @@ def forecast_circulating_supply_df(
 
     lock_target_in = lock_target
     for day_idx in range(1, sim_len):
-        pledge_base = compute_pledge_base(circ_supply, locked_fil)
+        pledge_base = compute_pledge_base(circ_supply, locked_fil, day_idx)
 
         cur_date = start_date + datetime.timedelta(days=day_idx)
         if lock_target_update_date is not None:
@@ -225,7 +230,7 @@ def forecast_circulating_supply_df(
         network_qap_byday_during_window[jj] = df_day['network_QAP']
         pledge_renewed_power_window[jj] = compute_new_pledge_for_added_power(
             df_day['day_network_reward'],
-            compute_pledge_base(df_tmp.iloc[jj+df_offset_ii-1]['circ_supply'], df_tmp.iloc[jj+df_offset_ii-1]['network_locked']),
+            compute_pledge_base(df_tmp.iloc[jj+df_offset_ii-1]['circ_supply'], df_tmp.iloc[jj+df_offset_ii-1]['network_locked'], day_idx),
             qap_renewed_during_window[jj],
             network_qap_byday_during_window[jj],
             df_day['network_baseline'],
@@ -250,7 +255,7 @@ def forecast_circulating_supply_df(
     current_day_idx = current_day - start_day
     lock_target_in = lock_target
     for day_idx in range(1, sim_len):
-        pledge_base = compute_pledge_base(circ_supply, locked_fil)
+        pledge_base = compute_pledge_base(circ_supply, locked_fil, day_idx)
 
         cur_date = start_date + datetime.timedelta(days=day_idx)
         if lock_target_update_date is not None:
