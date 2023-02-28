@@ -17,9 +17,9 @@ To learn more about how the model is designed, check the specifications linked a
 ## Prerequisites
 
 ```
-numpy>=1.23.1
-pandas>=1.4.3
-requests>=2.28.1
+numpy>=1.22
+pandas>=1.4
+requests>=2.28
 matplotlib>=3.5.2
 seaborn>=0.11.2
 ```
