@@ -79,6 +79,7 @@ def forecast_circulating_supply_df(
 
         consensus_pledge_method_before_intervention = intervention_config.get('consensus_pledge_method_before_intervention', 'circulating_supply').lower()
         consensus_pledge_method_after_intervention = intervention_config.get('consensus_pledge_method_after_intervention', 'circulating_supply').lower()
+        remove_baseline_from_pledge_qap_normalization = intervention_config.get('remove_baseline_from_pledge_qap_normalization', False)
 
         # upgrade_day = (upgrade_date - sim_start_date).days
         upgrade_day = (upgrade_date - start_date).days  # CS simulation starts from start_date, not sim_start_date
@@ -140,6 +141,7 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target_in,
+            remove_baseline_from_pledge_qap_normalization
         )
         day_locked_pledge, day_onboard_pledge, day_renewed_pledge = compute_day_locked_pledge(
             df_tmp["day_network_reward"].iloc[day_idx],
@@ -151,6 +153,7 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target_in,
+            remove_baseline_from_pledge_qap_normalization
         )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(
@@ -234,7 +237,8 @@ def forecast_circulating_supply_df(
             qap_renewed_during_window[jj],
             network_qap_byday_during_window[jj],
             df_day['network_baseline'],
-            lock_target
+            lock_target,
+            remove_baseline_from_pledge_qap_normalization
         )
         
         day_network_reward_vec[jj] = df_day['day_network_reward']
@@ -285,7 +289,8 @@ def forecast_circulating_supply_df(
             df["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target_in
+            lock_target_in,
+            remove_baseline_from_pledge_qap_normalization
         )
         if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
             pledge_delta -= cc_fil_locked_in_window_total
@@ -306,7 +311,8 @@ def forecast_circulating_supply_df(
             df["network_baseline"].iloc[day_idx],
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
-            lock_target_in
+            lock_target_in,
+            remove_baseline_from_pledge_qap_normalization
         )
                 
         # Compute daily change in block rewards collateral
