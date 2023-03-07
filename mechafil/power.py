@@ -54,16 +54,71 @@ def forecast_rb_daily_onboardings(
     return rb_onboarded_power_vec
 
 
+# def forecast_qa_daily_onboardings(
+#     rb_onboard_power: Union[np.array, float],
+#     fil_plus_rate: Union[np.array, float],
+#     forecast_lenght: int,
+#     fil_plus_m: float = 10.0,
+#     duration_m: Callable = None,
+#     duration: int = None,
+# ) -> np.array:
+#     # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
+#     qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
+#     qa_onboard_power = qa_factor * rb_onboard_power
+#     qa_onboard_power_vec = scalar_or_vector_to_vector(
+#         qa_onboard_power,
+#         forecast_lenght,
+#         err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length",
+#     )
+#     return qa_onboard_power_vec
+
+def compute_cc_qa_factor(duration: int) -> Union[np.array, float]:
+    return 1
+
+def compute_deal_qa_factor(duration: int) -> Union[np.array, float]:
+    return 10  # this is the FIL+ rate
+
 def forecast_qa_daily_onboardings(
     rb_onboard_power: Union[np.array, float],
     fil_plus_rate: Union[np.array, float],
     forecast_lenght: int,
-    fil_plus_m: float = 10.0,
-    duration_m: Callable = None,
     duration: int = None,
 ) -> np.array:
-    # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
-    qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
+    cc_onboarded_power = rb_onboard_power * (1-fil_plus_rate)
+    deal_onboarded_power_beforeQA = rb_onboard_power * fil_plus_rate
+
+    cc_qa_factor = 1
+    deal_qa_factor = 10
+
+    qa_onboard_power = cc_qa_factor * cc_onboarded_power + deal_qa_factor * deal_onboarded_power_beforeQA
+    qa_onboard_power_vec = scalar_or_vector_to_vector(
+        qa_onboard_power,
+        forecast_lenght,
+        err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length",
+    )
+    return qa_onboard_power_vec
+
+def cdm_sector_qap(duration, filp_pieces_size, sector_size=32):
+    filp_qap_factor = 10
+    max_sector_qap = 10
+    sdm_slope = 1
+    sdm_lag = 540
+    min_sector_duration = 360
+
+    x1 = max(min_sector_duration, duration - sdm_lag) / 360
+    x2 = (sector_size - filp_pieces_size + (filp_qap_factor * filp_pieces_size)) / sector_size
+    x3 = x1 * sdm_slope * x2
+    sector_qap = min(max_sector_qap, x3)
+
+    return sector_qap
+
+def forecast_qa_daily_onboardings_cdm(
+    rb_onboard_power: Union[np.array, float],
+    fil_plus_rate: Union[np.array, float],
+    forecast_lenght: int,
+    duration: int = None,
+) -> np.array:
+    qa_factor = cdm_sector_qap(duration, fil_plus_rate*32, 32)  # this is the QA factor for 1 sector
     qa_onboard_power = qa_factor * rb_onboard_power
     qa_onboard_power_vec = scalar_or_vector_to_vector(
         qa_onboard_power,
@@ -71,6 +126,26 @@ def forecast_qa_daily_onboardings(
         err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length",
     )
     return qa_onboard_power_vec
+
+def duration_master_fn(d, slope=1, clip=None):
+    if d < round(365*1.5):
+        return 1
+    else:
+        y1_slp1 = 1
+        y2_slp1 = 2 - 183/365.
+        x1_slp1 = round(365*1.5)
+        x2_slp1 = 365*2
+        m = (y2_slp1 - y1_slp1) / (x2_slp1 - x1_slp1)
+        m *= slope
+        # y-y1 = m*(x-x1)
+        y = m*(d - x1_slp1) + y1_slp1
+        if clip is not None:
+            if y > clip:
+                y = clip
+        return y
+    
+def duration_m_slp_0_285_noclip(d):
+    return duration_master_fn(d, slope=0.285, clip=None)
 
 
 # --------------------------------------------------------------------------------------
@@ -148,10 +223,10 @@ def forecast_power_stats(
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
-    qap_method: str = 'tunable'  # can be set to tunable or basic
-                                 # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    qap_method: str = 'basic',  # can be set to tunable or basic
+                                  # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    validate_qap_method(qap_method)
+    # validate_qap_method(qap_method)
     
     # Forecast onboards
     renewal_rate_vec = scalar_or_vector_to_vector(
@@ -163,16 +238,32 @@ def forecast_power_stats(
     day_rb_onboarded_power = forecast_rb_daily_onboardings(
         rb_onboard_power, forecast_lenght
     )
-
+    
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
-    day_qa_onboarded_power = forecast_qa_daily_onboardings(
-        rb_onboard_power,
-        fil_plus_rate,
-        forecast_lenght,
-        fil_plus_m,
-        duration_m,
-        duration,
-    )
+    if qap_method == 'basic':
+        day_qa_onboarded_power = forecast_qa_daily_onboardings(
+            day_rb_onboarded_power,
+            fil_plus_rate,
+            forecast_lenght,
+            duration,
+        )
+    elif qap_method == 'sdm':
+        day_qa_onboarded_power = forecast_qa_daily_onboardings(
+            day_rb_onboarded_power,
+            fil_plus_rate,
+            forecast_lenght,
+            duration,
+        )
+        sdm_factor = duration_m_slp_0_285_noclip(duration)
+        day_qa_onboarded_power = day_qa_onboarded_power * sdm_factor
+    elif qap_method == 'cdm':
+        day_qa_onboarded_power = forecast_qa_daily_onboardings_cdm(
+            day_rb_onboarded_power,
+            fil_plus_rate,
+            forecast_lenght,
+            duration,
+        )
+
     total_qa_onboarded_power = day_qa_onboarded_power.cumsum()
     # Initialize scheduled expirations and renewals
     day_rb_scheduled_expire_power = np.zeros(forecast_lenght)
@@ -212,7 +303,8 @@ def forecast_power_stats(
                 duration_m,
                 duration,
             )
-        elif qap_method == 'basic':
+        #elif qap_method == 'basic':
+        else:
             day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
                 day_i, day_qa_scheduled_expire_power, renewal_rate_vec
             )
