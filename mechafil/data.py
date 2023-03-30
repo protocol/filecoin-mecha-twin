@@ -7,11 +7,13 @@ from . import data_spacescope, data_starboard
 DEFAULT_DATA_BACKEND = 'spacescope'
 
 spacescope_obj = None
-def setup_spacescope_obj(auth_config=None):
+def setup_spacescope(auth_config_or_token):
     global spacescope_obj
-    spacescope_obj = data_spacescope.SpacescopeDataConnection(auth_config)
-setup_spacescope_obj()  # run it to default the auth-key.  User can override
-                        # by calling setup_spacescope_obj with a different config provided
+    spacescope_obj = data_spacescope.SpacescopeDataConnection(auth_config_or_token)
+
+def check_if_spacescope_configured():
+    if spacescope_obj is None:
+        raise ValueError("Spacescope object not configured. Please run setup_spacescope() with an bearer token configuration first!")
 
 def get_historical_network_stats(
     start_date: datetime.date, 
