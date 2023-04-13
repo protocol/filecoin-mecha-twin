@@ -37,9 +37,9 @@ def forecast_circulating_supply_df(
     known_scheduled_pledge_release_vec: np.array,
     lock_target: float = 0.3,
 ) -> pd.DataFrame:
-    start_day = (start_date - NETWORK_START).days
-    current_day = (current_date - NETWORK_START).days
-    end_day = (end_date - NETWORK_START).days
+    start_day = (start_date - NETWORK_START.date()).days
+    current_day = (current_date - NETWORK_START.date()).days
+    end_day = (end_date - NETWORK_START.date()).days
     # initialise dataframe and auxilialy variables
     df = initialise_circulating_supply_df(
         start_date,
