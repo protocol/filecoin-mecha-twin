@@ -45,9 +45,9 @@ def forecast_circulating_supply_df(
     intervention_config: dict = None,
     fpr_hist_info: tuple = None,
 ) -> pd.DataFrame:
-    start_day = (start_date - NETWORK_START).days
-    current_day = (current_date - NETWORK_START).days
-    end_day = (end_date - NETWORK_START).days
+    start_day = (start_date - NETWORK_START.date()).days
+    current_day = (current_date - NETWORK_START.date()).days
+    end_day = (end_date - NETWORK_START.date()).days
     # initialise dataframe and auxilialy variables
     df = initialise_circulating_supply_df(
         start_date,
