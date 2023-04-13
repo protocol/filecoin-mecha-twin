@@ -11,6 +11,7 @@ from .locking import (
     compute_day_locked_pledge,
 )
 from .power import scalar_or_vector_to_vector
+from .data import NETWORK_START
 
 import scenario_generator.utils as u
 from .locking import (
@@ -44,10 +45,9 @@ def forecast_circulating_supply_df(
     intervention_config: dict = None,
     fpr_hist_info: tuple = None,
 ) -> pd.DataFrame:
-    # we assume all stats started at main net launch, in 2020-10-15
-    start_day = (start_date - datetime.date(2020, 10, 15)).days
-    current_day = (current_date - datetime.date(2020, 10, 15)).days
-    end_day = (end_date - datetime.date(2020, 10, 15)).days
+    start_day = (start_date - NETWORK_START).days
+    current_day = (current_date - NETWORK_START).days
+    end_day = (end_date - NETWORK_START).days
     # initialise dataframe and auxilialy variables
     df = initialise_circulating_supply_df(
         start_date,
