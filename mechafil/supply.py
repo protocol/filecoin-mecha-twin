@@ -37,7 +37,6 @@ def forecast_circulating_supply_df(
     known_scheduled_pledge_release_vec: np.array,
     lock_target: float = 0.3,
 ) -> pd.DataFrame:
-    # we assume all stats started at main net launch, in 2020-10-15
     start_day = (start_date - NETWORK_START).days
     current_day = (current_date - NETWORK_START).days
     end_day = (end_date - NETWORK_START).days
