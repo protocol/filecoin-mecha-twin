@@ -260,7 +260,7 @@ class SpacescopeDataConnection:
         if start_date is None:
             start_date = NETWORK_START
         if end_date is None:
-            end_date = datetime.datetime.today()
+            end_date = datetime.datetime.today()-datetime.timedelta(days=2)
 
         historical_power_df = SpacescopeDataConnection.query_historical_power(
             start_date, end_date, chunk_days=chunk_days
@@ -277,7 +277,7 @@ class SpacescopeDataConnection:
         if start_date is None:
             start_date = NETWORK_START
         if end_date is None:
-            end_date = datetime.datetime.today()
+            end_date = datetime.datetime.today()-datetime.timedelta(days=2)
 
         historical_power_df = SpacescopeDataConnection.query_historical_power(
             start_date, end_date, chunk_days=chunk_days
@@ -294,7 +294,7 @@ class SpacescopeDataConnection:
         if start_date is None:
             start_date = NETWORK_START
         if end_date is None:
-            end_date = datetime.datetime.today()
+            end_date = datetime.datetime.today()-datetime.timedelta(days=2)
 
         historical_power_df = SpacescopeDataConnection.query_historical_power(
             start_date, end_date, chunk_days=chunk_days

@@ -4,7 +4,7 @@ import datetime
 from typing import Tuple
 
 DEFAULT_DATA_BACKEND = 'spacescope'
-NETWORK_START = datetime.datetime(2020, 10, 16)
+NETWORK_START = datetime.datetime(2020, 10, 15)
 
 from . import data_spacescope, data_starboard
 
