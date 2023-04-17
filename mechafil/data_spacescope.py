@@ -9,7 +9,7 @@ import json
 EXBI = 2**60
 PIB = 2**50
 
-NETWORK_START = datetime.datetime(2020, 10, 15)
+NETWORK_START = datetime.datetime(2020, 10, 16)
 DEFAULT_SPACESCOPE_CHUNK_SIZE_IN_DAYS = 90
 DEFAULT_AUTH_CONFIG = os.path.join(os.path.dirname(__file__), 'cfg', 'spacescope_auth.json')
 
@@ -33,6 +33,7 @@ class SpacescopeDataConnection:
         payload={}
         headers = {
         'authorization': cls.auth_token
+       # 'authorization': "Bearer ghp_OwewiTMsWbARNnClZIhAiWLbklJqTqgEKrlC"
         }
         response = requests.request("GET", url, headers=headers, data=payload)
         df = pd.DataFrame(response.json()['data'])

@@ -3,8 +3,9 @@ import numpy as np
 GIB = 2**30
 
 # Block reward collateral
-def compute_day_locked_rewards(day_network_reward: float) -> float:
-    return 0.75 * day_network_reward
+def compute_day_locked_rewards(day_network_reward: float, 
+                               day_shortfall_burn: float) -> float:
+    return 0.75 * (day_network_reward - day_shortfall_burn)
 
 
 def compute_day_reward_release(prev_network_locked_reward: float) -> float:
@@ -21,6 +22,7 @@ def compute_day_delta_pledge(
     baseline_power: float,
     renewal_rate: float,
     scheduled_pledge_release: float,
+    shortfall_rate: float, 
     lock_target: float = 0.3,
 ) -> float:
     onboards_delta = compute_new_pledge_for_added_power(
@@ -29,6 +31,7 @@ def compute_day_delta_pledge(
         day_onboarded_qa_power,
         total_qa_power,
         baseline_power,
+        shortfall_rate, 
         lock_target,
     )
     renews_delta = compute_renewals_delta_pledge(
@@ -53,6 +56,7 @@ def compute_day_locked_pledge(
     baseline_power: float,
     renewal_rate: float,
     scheduled_pledge_release: float,
+    shortfall_rate: float, 
     lock_target: float = 0.3,
 ) -> float:
     # Total locked from new onboards
@@ -62,8 +66,21 @@ def compute_day_locked_pledge(
         day_onboarded_qa_power,
         total_qa_power,
         baseline_power,
-        lock_target,
+        shortfall_rate,
+        lock_target
     )
+
+    # Compute the Pledge Shortfall Incurred for a given day 
+    day_shortfall = compute_new_pledge_for_added_power(
+        day_network_reward,
+        prev_circ_supply,
+        day_onboarded_qa_power,
+        total_qa_power,
+        baseline_power,
+        0.,
+        lock_target
+    ) - onboards_locked
+
     # Total locked from renewals
     original_pledge = renewal_rate * scheduled_pledge_release
     new_pledge = compute_new_pledge_for_added_power(
@@ -72,12 +89,14 @@ def compute_day_locked_pledge(
         day_renewed_qa_power,
         total_qa_power,
         baseline_power,
+        0, # Shortfall_rate upon renewal is 0
         lock_target,
     )
+
     renews_locked = max(original_pledge, new_pledge)
     # Total locked pledge
     locked = onboards_locked + renews_locked
-    return locked, renews_locked
+    return locked, renews_locked, day_shortfall
 
 
 def compute_renewals_delta_pledge(
@@ -100,6 +119,7 @@ def compute_renewals_delta_pledge(
         day_renewed_qa_power,
         total_qa_power,
         baseline_power,
+        0,
         lock_target,
     )
     renew_delta = max(0.0, new_pledge - original_pledge)
@@ -114,7 +134,8 @@ def compute_new_pledge_for_added_power(
     day_added_qa_power: float,
     total_qa_power: float,
     baseline_power: float,
-    lock_target: float,
+    shortfall_rate: float,
+    lock_target: float
 ) -> float:
     # storage collateral
     storage_pledge = 20.0 * day_network_reward * (day_added_qa_power / total_qa_power)
@@ -123,14 +144,16 @@ def compute_new_pledge_for_added_power(
     consensus_pledge = max(lock_target * prev_circ_supply * normalized_qap_growth, 0)
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
+    # adjust added pledge given network wide shortfall rate 
+    added_pledge *= 1 - shortfall_rate
 
     pledge_cap = day_added_qa_power * 1.0 / GIB  # The # of bytes in a GiB (Gibibyte)
     return min(pledge_cap, added_pledge)
 
 
 def get_day_schedule_pledge_release(
-    day_i,
-    current_day_i,
+    day_i: int,
+    current_day_i: int,
     day_pledge_locked_vec: np.array,
     known_scheduled_pledge_release_vec: np.array,
     duration: int,
