@@ -3,8 +3,10 @@ import numpy as np
 import datetime
 from typing import Tuple
 
-from . import data_spacescope, data_starboard
 DEFAULT_DATA_BACKEND = 'spacescope'
+NETWORK_START = datetime.datetime(2020, 10, 15)
+
+from . import data_spacescope, data_starboard
 
 spacescope_obj = None
 def setup_spacescope(auth_config_or_token):

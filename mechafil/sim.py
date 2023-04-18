@@ -20,6 +20,10 @@ from .utils import validate_qap_method
 def setup_data_access(bearer_token_or_cfg: str):
     setup_spacescope(bearer_token_or_cfg)
 
+def validate_current_date(current_date: datetime.date):
+    if current_date > (datetime.date.today() - datetime.timedelta(days=2)):
+        raise ValueError("Current date must be at least 2 days in the past!")
+
 def run_simple_sim(
     start_date: datetime.date,
     current_date: datetime.date,
@@ -34,6 +38,7 @@ def run_simple_sim(
 ) -> pd.DataFrame:
     validate_qap_method(qap_method)
     setup_data_access(bearer_token_or_cfg)
+    validate_current_date(current_date)
 
     end_date = current_date + datetime.timedelta(days=forecast_length)
     # Get sector scheduled expirations
