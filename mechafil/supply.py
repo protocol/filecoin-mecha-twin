@@ -68,8 +68,9 @@ def forecast_circulating_supply_df(
             day_shortfall_burn = 0.
         else: 
             shortfall_rate = sim_shortfall_rate
-            # Compute amount of power on the network that has used the shortfall
-            network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/df["network_QAP"].iloc[day_idx]
+            # Compute amount of power on the network that has used the shortfall 
+            ## ADJUST THIS 
+            network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/df["network_QAP"].iloc[day_idx] # fix denom
             # Compute Daily Burn due to shortfall usage
             if shortfall_method == 'burn':
                 day_shortfall_burn = network_shortfall_proportion * df['day_network_reward'].iloc[day_idx]
@@ -132,10 +133,13 @@ def forecast_circulating_supply_df(
             MAX_FEE_REWARD_FRACTION = 0.25
             amount_back_to_pledge = network_shortfall_proportion * df['day_network_reward'].iloc[day_idx] * (1 - MAX_FEE_REWARD_FRACTION) * TOKEN_LEASE_FEE
             day_locked_rewards += amount_back_to_pledge
+        else: 
+            amount_back_to_pledge = 0.
+         
 
         reward_delta = day_locked_rewards - day_reward_release
         # Update dataframe
-        df["day_locked_pledge"].iloc[day_idx] = day_locked_pledge
+        df["day_locked_pledge"].iloc[day_idx] = day_locked_pledge + amount_back_to_pledge
         df["day_renewed_pledge"].iloc[day_idx] = day_renewed_pledge
         df["network_locked_pledge"].iloc[day_idx] = (
             df["network_locked_pledge"].iloc[day_idx - 1] + pledge_delta
