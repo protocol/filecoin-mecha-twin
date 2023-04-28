@@ -59,6 +59,9 @@ def forecast_circulating_supply_df(
     # Simulation for loop
     current_day_idx = current_day - start_day
     sim_shortfall_rate = shortfall_rate
+
+    # Get Total Power on Date of Simulation Start (current_day_idx)
+    network_power_curr_day = df['network_QAP'].iloc[current_day_idx]
     for day_idx in range(1, sim_len):
 
         # No Shortfall Prior to current_day_idx
@@ -70,7 +73,7 @@ def forecast_circulating_supply_df(
             shortfall_rate = sim_shortfall_rate
             # Compute amount of power on the network that has used the shortfall 
             ## ADJUST THIS 
-            network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/df["network_QAP"].iloc[day_idx] # fix denom
+            network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/(network_power_curr_day + ) # fix denom
             # Compute Daily Burn due to shortfall usage
             if shortfall_method == 'burn':
                 day_shortfall_burn = network_shortfall_proportion * df['day_network_reward'].iloc[day_idx]
@@ -135,7 +138,6 @@ def forecast_circulating_supply_df(
             day_locked_rewards += amount_back_to_pledge
         else: 
             amount_back_to_pledge = 0.
-         
 
         reward_delta = day_locked_rewards - day_reward_release
         # Update dataframe

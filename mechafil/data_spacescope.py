@@ -83,7 +83,7 @@ class SpacescopeDataConnection:
             scheduled_df["date"] <= pd.to_datetime(current_date, utc="UTC")
         ]
         rb_renewal_rate = (
-            filter_scheduled_df["extended_rb"] / filter_scheduled_df["total_rb"]
+            filter_scheduled_df["extended_pledge"] / filter_scheduled_df["schedule_expire_pledge"]
         ).values
         day_renewed_qa_power = filter_scheduled_df["extended_qa"].values
         renewal_df = pd.DataFrame(
