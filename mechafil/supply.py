@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import datetime
 from typing import Union
+import math 
+from .consts import DAY, SECTOR_SIZE, YEAR
 
 from .locking import (
     get_day_schedule_pledge_release,
@@ -20,10 +22,13 @@ locked FIL. We believe that it could be due to the following reasons:
   c) If we're sure the locking discrepancy is not a bug but rather a deficiency in the model popping up via the approximations used, we may way want to include a learnable factor to correct the difference
 """
 
-# Shortfall Proposal Constants 
+# Global Vars for Repay-Ratchet
 DEFAULT_MAX_REPAYMENT_TERM = 3 * 365 
 DEFAULT_MAX_FEE_REWARD_FRACTION = 0.25
-#DEFAULT_REWARD_PROJECTION_DECAY = REWARD_DECAY + BASELINE_GROWTH
+REWARD_DECAY = 1 - math.exp(math.log(1/2)/(6*YEAR))
+# Baseline at epoch = initial baseline * (1+b)^epochs
+BASELINE_GROWTH = math.exp(math.log(3)/YEAR) - 1
+DEFAULT_REWARD_PROJECTION_DECAY = REWARD_DECAY + BASELINE_GROWTH
 
 
 def forecast_circulating_supply_df(
@@ -86,7 +91,10 @@ def forecast_circulating_supply_df(
             elif shortfall_method == 'interest_free':
                 day_shortfall_burn = network_shortfall_proportion * df['day_network_reward'].iloc[day_idx] * shortfall_rate**(0.75)
             elif shortfall_method == 'repay':
-                MAX_FEE_REWARD_FRACTION = 0.25
+                MAX_FEE_REWARD_FRACTION = DEFAULT_MAX_FEE_REWARD_FRACTION
+                # Calculate max_shortfall allowed for given day 
+
+                # Onboard 
                 day_shortfall_burn = network_shortfall_proportion * df['day_network_reward'].iloc[day_idx] * shortfall_rate *  MAX_FEE_REWARD_FRACTION
             df["day_shortfall_burn"].iloc[day_idx] = day_shortfall_burn 
 
@@ -220,8 +228,26 @@ def initialise_circulating_supply_df(
     df = df.merge(mint_df.drop(columns=["days"]), on="date", how="inner")
     return df
 
-#def max_shortfall(
- #   network_reward: float, 
-  #  network_power,
-   # miner_power, 
-    
+# Helper Funcs for Repay_Ratchet 
+def max_shortfall(network_reward_estimate: float, 
+                  network_power_estimate: float, 
+                  power: float, 
+                  period: int, 
+                  repayment_take: float) -> float: # Note, for repayment_take you should pass in the max_repayment_take (= 1 - MAX_REWARD_FRACTION)
+    return repayment_take *  expected_reward_for_power(network_reward_estimate,
+                                                       network_power_estimate, 
+                                                       power, 
+                                                       period)
+                                                        
+def expected_reward_for_power(network_reward: float, 
+                              network_power: float, 
+                              power: float, 
+                              period: int) -> float:
+    decay = REWARD_DECAY + BASELINE_GROWTH 
+    return sum_of_exponential_decay(decay, period) * network_reward * power/network_power
+
+def sum_of_exponential_decay(duration: int, 
+                             decay: float) -> float: 
+    return (1 - math.pow(1 - decay, duration) + decay * math.pow(1 - decay, duration)) / decay
+
+
