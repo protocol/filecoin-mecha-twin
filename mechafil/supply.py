@@ -20,6 +20,11 @@ locked FIL. We believe that it could be due to the following reasons:
   c) If we're sure the locking discrepancy is not a bug but rather a deficiency in the model popping up via the approximations used, we may way want to include a learnable factor to correct the difference
 """
 
+# Shortfall Proposal Constants 
+DEFAULT_MAX_REPAYMENT_TERM = 3 * 365 
+DEFAULT_MAX_FEE_REWARD_FRACTION = 0.25
+#DEFAULT_REWARD_PROJECTION_DECAY = REWARD_DECAY + BASELINE_GROWTH
+
 
 def forecast_circulating_supply_df(
     start_date: datetime.date,
@@ -73,7 +78,8 @@ def forecast_circulating_supply_df(
             shortfall_rate = sim_shortfall_rate
             # Compute amount of power on the network that has used the shortfall 
             ## ADJUST THIS 
-            network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/(network_power_curr_day + ) # fix denom
+            #network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/(network_power_curr_day + ) # fix denom
+            network_shortfall_proportion = (shortfall_rate*df['day_onboarded_power_QAP'].iloc[current_day_idx:day_idx].sum())/df["network_QAP"].iloc[day_idx]
             # Compute Daily Burn due to shortfall usage
             if shortfall_method == 'burn':
                 day_shortfall_burn = network_shortfall_proportion * df['day_network_reward'].iloc[day_idx]
@@ -213,3 +219,9 @@ def initialise_circulating_supply_df(
     df = df.merge(vest_df, on="date", how="inner")
     df = df.merge(mint_df.drop(columns=["days"]), on="date", how="inner")
     return df
+
+#def max_shortfall(
+ #   network_reward: float, 
+  #  network_power,
+   # miner_power, 
+    
