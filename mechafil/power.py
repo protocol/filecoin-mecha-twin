@@ -17,7 +17,7 @@ def scalar_or_vector_to_vector(
         return np.ones(expected_len) * input_x
     else:
         err_msg_out = (
-            "vector input does not match expected length!"
+            "vector input does not match expected length! expected_len=%d actual_len=%d" % (expected_len, len(input_x))
             if err_msg is None
             else err_msg
         )
