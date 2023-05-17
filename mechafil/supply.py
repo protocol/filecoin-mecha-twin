@@ -82,6 +82,7 @@ def forecast_circulating_supply_df(
         consensus_pledge_base_before_intervention = intervention_config.get('consensus_pledge_base_before_intervention', 'circulating_supply').lower()
         consensus_pledge_base_after_intervention = intervention_config.get('consensus_pledge_base_after_intervention', 'circulating_supply').lower()
         onboard_ratio_callable = intervention_config.get('onboard_ratio_callable', locking.spec_onboard_ratio)
+        onboard_ratio_callable_kwargs_fn = intervention_config.get('onboard_ratio_callable_kwargs_fn', None)
 
         # upgrade_day = (upgrade_date - sim_start_date).days
         upgrade_day = (upgrade_date - start_date).days  # CS simulation starts from start_date, not sim_start_date
@@ -104,6 +105,21 @@ def forecast_circulating_supply_df(
             avail_supply = cs + network_locked
             return avail_supply - locked_reward
 
+    def get_onboard_ratio_kwargs(df, day_in):
+        if day_in > upgrade_day:
+            if onboard_ratio_callable_kwargs_fn is None:
+                return {}
+            else:
+                return onboard_ratio_callable_kwargs_fn(df, day_in, lock_target)
+        else:
+            return {}
+        
+    def get_onboard_fn(day_in):
+        if day_in > upgrade_day:
+            return onboard_ratio_callable
+        else:
+            return locking.spec_onboard_ratio
+        
     df_tmp = initialise_circulating_supply_df(
         start_date,
         end_date,
@@ -121,6 +137,9 @@ def forecast_circulating_supply_df(
     lock_target_in = lock_target
     for day_idx in range(1, sim_len):
         pledge_base = compute_pledge_base(circ_supply, locked_fil, locked_reward, day_idx)
+        onboard_ratio_kwargs = get_onboard_ratio_kwargs(df_tmp, day_idx)
+        onboard_ratio_fn = get_onboard_fn(day_idx)
+        # print(day_idx, upgrade_day, pledge_base, onboard_ratio_kwargs, onboard_ratio_fn)
 
         cur_date = start_date + datetime.timedelta(days=day_idx)
         if lock_target_update_date is not None:
@@ -146,7 +165,8 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target_in,
-            onboard_ratio_callable,
+            onboard_ratio_callable=onboard_ratio_fn,
+            onboard_ratio_callable_kwargs=onboard_ratio_kwargs
         )
         day_locked_pledge, day_onboard_pledge, day_renewed_pledge = compute_day_locked_pledge(
             df_tmp["day_network_reward"].iloc[day_idx],
@@ -158,7 +178,8 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target_in,
-            onboard_ratio_callable,
+            onboard_ratio_callable=onboard_ratio_fn,
+            onboard_ratio_callable_kwargs=onboard_ratio_kwargs
         )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(
@@ -248,7 +269,8 @@ def forecast_circulating_supply_df(
             network_qap_byday_during_window[jj],
             df_day['network_baseline'],
             lock_target,
-            onboard_ratio_callable,
+            # TODO: I don't think anything is needed here for onboard ratio, but need to double chcek!
+            # reason is that I think this is backward looking, so we know we were using the spec definition of onboard ratio at that time
         )
         
         day_network_reward_vec[jj] = df_day['day_network_reward']
@@ -270,6 +292,9 @@ def forecast_circulating_supply_df(
     lock_target_in = lock_target
     for day_idx in range(1, sim_len):
         pledge_base = compute_pledge_base(circ_supply, locked_fil, locked_reward, day_idx)
+        onboard_ratio_kwargs = get_onboard_ratio_kwargs(df, day_idx)
+        onboard_ratio_fn = get_onboard_fn(day_idx)
+        # print(day_idx, upgrade_day, pledge_base, onboard_ratio_kwargs, onboard_ratio_fn, circ_supply)
 
         cur_date = start_date + datetime.timedelta(days=day_idx)
         if lock_target_update_date is not None:
@@ -300,7 +325,8 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target_in,
-            onboard_ratio_callable,
+            onboard_ratio_callable=onboard_ratio_fn,
+            onboard_ratio_callable_kwargs=onboard_ratio_kwargs,
         )
         if intervention_type == 'cc_early_renewal' and day_idx == cs_offset_ii:
             pledge_delta -= cc_fil_locked_in_window_total
@@ -322,7 +348,8 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target_in,
-            onboard_ratio_callable,
+            onboard_ratio_callable=onboard_ratio_fn,
+            onboard_ratio_callable_kwargs=onboard_ratio_kwargs,
         )
                 
         # Compute daily change in block rewards collateral

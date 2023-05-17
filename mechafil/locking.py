@@ -30,7 +30,9 @@ def compute_day_delta_pledge(
     scheduled_pledge_release: float,
     lock_target: float = 0.3,
     onboard_ratio_callable: callable = spec_onboard_ratio,
+    onboard_ratio_callable_kwargs: dict = {},
 ) -> float:
+    # print('cddp', onboard_ratio_callable_kwargs)
     onboards_delta = compute_new_pledge_for_added_power(
         day_network_reward,
         prev_pledge_base,
@@ -39,6 +41,7 @@ def compute_day_delta_pledge(
         baseline_power,
         lock_target,
         onboard_ratio_callable,
+        onboard_ratio_callable_kwargs
     )
     renews_delta = compute_renewals_delta_pledge(
         day_network_reward,
@@ -50,6 +53,7 @@ def compute_day_delta_pledge(
         scheduled_pledge_release,
         lock_target,
         onboard_ratio_callable,
+        onboard_ratio_callable_kwargs
     )
     return onboards_delta + renews_delta, onboards_delta, renews_delta
 
@@ -65,6 +69,7 @@ def compute_day_locked_pledge(
     scheduled_pledge_release: float,
     lock_target: float = 0.3,
     onboard_ratio_callable: callable = spec_onboard_ratio,
+    onboard_ratio_callable_kwargs: dict = {},
 ) -> float:
     # Total locked from new onboards
     onboards_locked = compute_new_pledge_for_added_power(
@@ -75,6 +80,7 @@ def compute_day_locked_pledge(
         baseline_power,
         lock_target,
         onboard_ratio_callable,
+        onboard_ratio_callable_kwargs
     )
     # Total locked from renewals
     original_pledge = renewal_rate * scheduled_pledge_release
@@ -86,6 +92,7 @@ def compute_day_locked_pledge(
         baseline_power,
         lock_target,
         onboard_ratio_callable,
+        onboard_ratio_callable_kwargs
     )
     renews_locked = max(original_pledge, new_pledge)
     # Total locked pledge
@@ -104,6 +111,7 @@ def compute_renewals_delta_pledge(
     scheduled_pledge_release: float,
     lock_target: float,
     onboard_ratio_callable: callable = spec_onboard_ratio,
+    onboard_ratio_callable_kwargs: dict = {},
 ) -> float:
     # Delta from sectors expiring
     expire_delta = -(1 - renewal_rate) * scheduled_pledge_release
@@ -117,6 +125,7 @@ def compute_renewals_delta_pledge(
         baseline_power,
         lock_target,
         onboard_ratio_callable,
+        onboard_ratio_callable_kwargs
     )
     renew_delta = max(0.0, new_pledge - original_pledge)
 
@@ -134,23 +143,26 @@ def compute_new_pledge_for_added_power(
     baseline_power: float,
     lock_target: float,
     onboard_ratio_callable: callable = spec_onboard_ratio,
+    onboard_ratio_callable_kwargs: dict = {},
 ) -> float:
     """
     A generalized version of consensus pledge has 3 components:
     1. Target Lock
     2. Power Onboard Ratio
-    3. Measure of token supply
+    3. Pledge base
     
-    consensus_pledge = lock_target * token_supply * power_onboard_ratio
+    consensus_pledge = lock_target * pledge_base * power_onboard_ratio
     """
 
     # storage collateral
     storage_pledge = 20.0 * day_network_reward * (day_added_qa_power / total_qa_power)
 
     # consensus collateral
-    normalized_qap_growth = onboard_ratio_callable(day_added_qa_power, total_qa_power, baseline_power)
+    # print('cnpfap', onboard_ratio_callable_kwargs)
+    normalized_qap_growth = onboard_ratio_callable(day_added_qa_power, total_qa_power, baseline_power, **onboard_ratio_callable_kwargs)
 
     consensus_pledge = max(lock_target * prev_pledge_base * normalized_qap_growth, 0)
+    # print(lock_target*prev_pledge_base, consensus_pledge)
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
 
