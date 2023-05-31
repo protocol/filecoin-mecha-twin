@@ -5,8 +5,8 @@ import pandas as pd
 from .data import get_storage_baseline_value, \
     get_cum_capped_rb_power, get_cum_capped_qa_power
 
-EXBI = 2**60
 PIB = 2**50
+EB = 10**18
 LAMBDA = np.log(2) / (
     6.0 * 365
 )  # minting exponential reward decay rate (6yrs half-life)
@@ -19,7 +19,7 @@ GROWTH_RATE = float(
 )  # daily baseline growth rate (the "g" from https://spec.filecoin.io/#section-systems.filecoin_token)
 BASELINE_STORAGE = (
     2.88888888
-    * EXBI
+    * EB
     # the b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
 )
 # TODO: understand why the baseline value from startboard differs from the spec!
@@ -90,8 +90,7 @@ def compute_baseline_power_array(
 
 
 def network_time(cum_capped_power: float) -> float:
-    EXA_TO_EIB = (10**18) / (2**60)
-    b0 = BASELINE_STORAGE * EXA_TO_EIB
+    b0 = BASELINE_STORAGE
     g = GROWTH_RATE
     return (1 / g) * np.log(((g * cum_capped_power) / b0) + 1)
 
