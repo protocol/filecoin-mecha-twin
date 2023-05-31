@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="mechaFIL",
-    version="1.9",
+    version="1.10",
     author="Maria Silva, Tom Mellan, Kiran Karra",
     author_email="misilva73@gmail.com, t.mellan@imperial.ac.uk, kiran.karra@gmail.com",
     description="Mechanistic model for the Filecoin Economy",

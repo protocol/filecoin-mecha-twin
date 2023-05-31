@@ -2,11 +2,11 @@ import datetime
 import numpy as np
 import pandas as pd
 
+from .constants import EXA, EXBI, PIB
 from .data import get_storage_baseline_value, \
     get_cum_capped_rb_power, get_cum_capped_qa_power
 
-EXBI = 2**60
-PIB = 2**50
+
 LAMBDA = np.log(2) / (
     6.0 * 365
 )  # minting exponential reward decay rate (6yrs half-life)
@@ -17,13 +17,18 @@ BASELINE_ALLOC = 0.7 * STORAGE_MINING  # total baseline minting allocation
 GROWTH_RATE = float(
     np.log(2) / 365.0
 )  # daily baseline growth rate (the "g" from https://spec.filecoin.io/#section-systems.filecoin_token)
+
+# NOTE: the baseline storage value is the baseline storage power at the genesis
+# The spec notes that this value is 2.888888888, but the actual data from starboard
+# shows that the value is 2.766213637444971.  We use the actual data here.
+#
+# Query:
+# 3189227188947035000 from https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power
 BASELINE_STORAGE = (
     2.766213637444971
-    * EXBI
+    * EXA
     # the b_0 from https://spec.filecoin.io/#section-systems.filecoin_token
 )
-# TODO: understand why the baseline value from startboard differs from the spec!
-# 3189227188947035000 from https://observable-api.starboard.ventures/api/v1/observable/network-storage-capacity/new_baseline_power
 
 def compute_minting_trajectory_df(
     start_date: datetime.date,
@@ -89,8 +94,7 @@ def compute_baseline_power_array(
 
 
 def network_time(cum_capped_power: float) -> float:
-    EXA_TO_EIB = (10**18) / (2**60)
-    b0 = BASELINE_STORAGE * EXA_TO_EIB
+    b0 = BASELINE_STORAGE
     g = GROWTH_RATE
     return (1 / g) * np.log(((g * cum_capped_power) / b0) + 1)
 
