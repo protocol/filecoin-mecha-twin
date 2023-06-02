@@ -33,6 +33,7 @@ def run_simple_sim(
     fil_plus_rate: Union[np.array, float],
     duration: int,
     bearer_token_or_cfg: str,
+    daily_burn: float = None,
     qap_method: str = 'basic' # can be set to tunable or basic
                               # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> pd.DataFrame:
@@ -93,8 +94,13 @@ def run_simple_sim(
     start_day_stats = fil_stats_df.iloc[0]
     circ_supply_zero = start_day_stats["circulating_fil"]
     locked_fil_zero = start_day_stats["locked_fil"]
-    daily_burnt_fil = fil_stats_df["burnt_fil"].diff().mean()
+
+    if daily_burn is None: 
+        daily_burnt_fil = fil_stats_df["burnt_fil"].diff().mean()
+    else: 
+        daily_burnt_fil = daily_burn
     burnt_fil_vec = fil_stats_df["burnt_fil"].values
+    
     forecast_renewal_rate_vec = scalar_or_vector_to_vector(
         renewal_rate, forecast_length
     )
