@@ -4,9 +4,7 @@ import numpy as np
 import datetime
 from typing import Tuple
 
-EXBI = 2**60
-PIB = 2**50
-
+from .constants import EXBI, PIB
 
 def get_historical_network_stats(
     start_date: datetime.date, current_date: datetime.date, end_date: datetime.date
