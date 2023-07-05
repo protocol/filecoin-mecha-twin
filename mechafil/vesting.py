@@ -12,7 +12,7 @@ MINING_RESERVE = 0.15 * FIL_BASE
 
 
 def compute_vesting_trajectory_df(
-    start_date: datetime.date, end_date: datetime.date
+    start_date: datetime.date, end_date: datetime.date, start_vested_amt = None
 ) -> pd.DataFrame:
     """
     15% to PL -> 6-year linear vesting
@@ -38,6 +38,7 @@ def compute_vesting_trajectory_df(
     # Get entire daily vesting trajectory
     full_vest_df = pd.DataFrame(
         {
+            'days': np.arange(0, end_day),
             "date": pd.date_range(launch_date, end_date, freq="d")[:-1],
             "six_month_vest_saft": vest(19_015_887 + 32_787_700, 183, end_day),
             "one_year_vest_saft": vest(22_421_712 + 9_400_000, 365 * 1, end_day),
@@ -52,10 +53,14 @@ def compute_vesting_trajectory_df(
     # Filter vesting trajectory for desired dates
     vest_df = full_vest_df[full_vest_df["date"] >= start_date]
     # Compute total cumulative vesting
-    vest_df.loc[:, "total_day_vest"] = vest_df.drop(columns=["date"]).sum(axis=1)
-    start_vested_amt = get_vested_amount(start_date)
+    vest_df.loc[:, "total_day_vest"] = vest_df.drop(columns=['days', "date"]).sum(axis=1)
+    if start_vested_amt is None:
+        start_vested_amt = get_vested_amount(start_date)
+    
     vest_df.loc[:, "total_vest"] = vest_df["total_day_vest"].cumsum() + start_vested_amt
-    vest_df = vest_df[["date", "total_vest"]]
+    vest_df = vest_df[['days', "date", 'total_day_vest', "total_vest", "six_month_vest_saft", 
+                       "one_year_vest_saft", "two_year_vest_saft", "three_year_vest_saft", "six_year_vest_saft", 
+                       "six_year_vest_pl", "six_year_vest_foundation"]]
     return vest_df
 
 

@@ -56,6 +56,7 @@ def compute_day_locked_pledge(
     lock_target: float = 0.3,
 ) -> float:
     # Total locked from new onboards
+    # print('mechafil', day_network_reward, prev_circ_supply, day_onboarded_qa_power/2**50, total_qa_power/2**50, baseline_power/2**50, lock_target)
     onboards_locked = compute_new_pledge_for_added_power(
         day_network_reward,
         prev_circ_supply,
@@ -64,6 +65,7 @@ def compute_day_locked_pledge(
         baseline_power,
         lock_target,
     )
+    # print('mechafil', onboards_locked)
     # Total locked from renewals
     original_pledge = renewal_rate * scheduled_pledge_release
     new_pledge = compute_new_pledge_for_added_power(
@@ -77,6 +79,7 @@ def compute_day_locked_pledge(
     renews_locked = max(original_pledge, new_pledge)
     # Total locked pledge
     locked = onboards_locked + renews_locked
+    # print('mechafil', locked, renews_locked)
     return locked, renews_locked
 
 

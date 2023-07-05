@@ -150,9 +150,12 @@ def get_storage_baseline_value(
     # Get baseline values from Starboard API
     bp_df = query_historical_baseline_power(data_backend)
     # Extract baseline value at date
+    """
     init_baseline_bytes = bp_df[bp_df["date"] >= pd.to_datetime(date, utc="UTC")].iloc[
         0, 1
     ]
+    """
+    init_baseline_bytes = bp_df[bp_df['date'] >= date].iloc[0,1]
     return init_baseline_bytes
     
 
@@ -167,7 +170,8 @@ def get_cum_capped_rb_power(
     # Compute cumulative capped RB power
     df["capped_power"] = np.min(df[["baseline", "rb_power"]].values, axis=1)
     df["cum_capped_power"] = df["capped_power"].cumsum()
-    date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
+    #date_df = df[df["date"] >= pd.to_datetime(date, utc="UTC")]
+    date_df = df[df['date'] >= date]
     init_cum_capped_power = date_df["cum_capped_power"].iloc[0]
     return init_cum_capped_power
 

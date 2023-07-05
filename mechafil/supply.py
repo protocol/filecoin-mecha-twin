@@ -90,6 +90,19 @@ def forecast_circulating_supply_df(
             scheduled_pledge_release,
             lock_target,
         )
+        # print('%s,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f' % 
+        #       ('mechafil', 
+        #        df["day_network_reward"].iloc[day_idx], 
+        #        circ_supply, 
+        #        df["day_onboarded_power_QAP"].iloc[day_idx]/2**50, 
+        #        df["day_renewed_power_QAP"].iloc[day_idx]/2**50, 
+        #        df["network_QAP"].iloc[day_idx]/2**60, 
+        #        df["network_baseline"].iloc[day_idx]/2**60, 
+        #        renewal_rate_vec[day_idx],
+        #        scheduled_pledge_release,
+        #        day_locked_pledge,
+        #        day_renewed_pledge,)
+        # )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(
             df["day_network_reward"].iloc[day_idx]
@@ -110,12 +123,27 @@ def forecast_circulating_supply_df(
         df["network_locked"].iloc[day_idx] = (
             df["network_locked"].iloc[day_idx - 1] + pledge_delta + reward_delta
         )
+        # print('%s,%0.02f,%0.02f,%0.02f,%0.02f' % 
+        #     ('mechafil', 
+        #     df["network_locked"].iloc[day_idx - 1], 
+        #     pledge_delta, 
+        #     reward_delta,
+        #     df["network_locked"].iloc[day_idx], )
+        # )
         # Update gas burnt
         if df["network_gas_burn"].iloc[day_idx] == 0.0:
             df["network_gas_burn"].iloc[day_idx] = (
                 df["network_gas_burn"].iloc[day_idx - 1] + daily_burnt_fil
             )
         # Find circulating supply balance and update
+        # print('=> %s,%0.02f,%0.02f,%0.02f,%0.02f,%0.02f' % 
+        #       ('mechafil', 
+        #        df["disbursed_reserve"].iloc[day_idx], 
+        #        df["cum_network_reward"].iloc[day_idx], 
+        #        df["total_vest"].iloc[day_idx], 
+        #        df["network_locked"].iloc[day_idx], 
+        #        df["network_gas_burn"].iloc[day_idx],)
+        # )
         circ_supply = (
             df["disbursed_reserve"].iloc[
                 day_idx
