@@ -90,7 +90,8 @@ class SpacescopeDataConnection:
             {
                 'date': pd.to_datetime(filter_scheduled_df['date']).dt.date,
                 'rb_renewal_rate': rb_renewal_rate,
-                'day_renewed_qa_power_pib': day_renewed_qa_power
+                'day_renewed_qa_power_pib': day_renewed_qa_power,
+                'day_renewed_rb_power_pib': filter_scheduled_df["extended_rb"].values
             }
         )
         return renewal_df
