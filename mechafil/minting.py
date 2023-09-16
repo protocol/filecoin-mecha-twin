@@ -40,7 +40,9 @@ def compute_minting_trajectory_df(
     qa_total_power_eib: np.array,
     qa_day_onboarded_power_pib: np.array,
     qa_day_renewed_power_pib: np.array,
-    minting_base: str = 'RBP'
+    minting_base: str = 'RBP',
+    baseline_power_array = None,
+    zero_cum_capped_power = None,
 ) -> pd.DataFrame:
     # we assume minting started at main net launch, in 2020-10-15
     start_day = (start_date - datetime.date(2020, 10, 15)).days
@@ -64,10 +66,15 @@ def compute_minting_trajectory_df(
     # Compute cumulative rewards due to simple minting
     df["cum_simple_reward"] = df["days"].pipe(cum_simple_minting)
     # Compute cumulative rewards due to baseline minting
-    df["network_baseline"] = compute_baseline_power_array(start_date, end_date)
+    if baseline_power_array is None:
+        df["network_baseline"] = compute_baseline_power_array(start_date, end_date)
+    else:
+        df["network_baseline"] = baseline_power_array
 
     df["capped_power"] = np.min(df[["network_baseline", capped_power_reference]].values, axis=1)
-    zero_cum_capped_power = get_cum_capped_rb_power(start_date)
+    if zero_cum_capped_power is None:
+        zero_cum_capped_power = get_cum_capped_rb_power(start_date)
+
     df["cum_capped_power"] = df["capped_power"].cumsum() + zero_cum_capped_power
     df["network_time"] = df["cum_capped_power"].pipe(network_time)
     df["cum_baseline_reward"] = df["network_time"].pipe(cum_baseline_reward)
