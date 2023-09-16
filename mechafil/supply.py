@@ -281,12 +281,9 @@ def forecast_circulating_supply_df(
     termination_fee_in_FIL = np.mean(np.convolve(day_network_reward_vec*cc_pct_at_time_of_onboard_and_renew_vec, np.ones(termination_fee_days, dtype=int), 'valid'))
     
     # Simulation for loop
-
-    ########################################################################################
-    # NOTE: I think this reset of values was missing before and was a bug??
+    # Reset values from temporary accumulation
     circ_supply = circ_supply_zero
     locked_fil = locked_fil_zero
-    ########################################################################################
 
     current_day_idx = current_day - start_day
     lock_target_in = lock_target

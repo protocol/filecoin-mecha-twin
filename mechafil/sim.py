@@ -5,7 +5,7 @@ import numpy as np
 import datetime
 from typing import Union
 
-from .data import get_historical_network_stats, get_sector_expiration_statsi, setup_spacescope
+from .data import get_historical_network_stats, get_sector_expiration_stats, setup_spacescope
 from .power import (
     forecast_power_stats,
     build_full_power_stats_df,

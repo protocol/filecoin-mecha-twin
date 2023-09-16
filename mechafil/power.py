@@ -26,22 +26,6 @@ def scalar_or_vector_to_vector(
 
 
 # --------------------------------------------------------------------------------------
-#  QA Multiplier functions
-# --------------------------------------------------------------------------------------
-def compute_qa_factor(
-    fil_plus_rate: Union[np.array, float],
-    fil_plus_m: float = 10.0,
-    duration_m: Callable = None,
-    duration: int = None,
-) -> Union[np.array, float]:
-    fil_plus_multipler = 1.0 + (fil_plus_m - 1) * fil_plus_rate
-    if duration_m is None:
-        return fil_plus_multipler
-    else:
-        return duration_m(duration) * fil_plus_multipler
-
-
-# --------------------------------------------------------------------------------------
 #  Onboardings
 # --------------------------------------------------------------------------------------
 def forecast_rb_daily_onboardings(
@@ -58,42 +42,49 @@ def forecast_rb_daily_onboardings(
 def forecast_qa_daily_onboardings(
     rb_onboard_power: Union[np.array, float],
     fil_plus_rate: Union[np.array, float],
-    forecast_lenght: int,
+    forecast_length: int,
     fil_plus_m: float = 10.0,
-    duration_m: Callable = None,
-    duration: int = None,
+    cc_multiplier_fn: Callable = None,
+    cc_multiplier_fn_kwargs: dict = None,
+    filp_multiplier_fn: Callable = None,
+    filp_multiplier_fn_kwargs: dict = None,
     intervention_day: int = None,
-    sdm_onboard_before_intervention: bool = False,
-    sdm_onboard_after_intervention: bool = True
+    update_onboard_power_multiplier_before_intervention: bool = False,
+    update_onboard_power_multiplier_after_intervention: bool = True
 ) -> np.array:
-    # If duration_m is not provided, qa_factor = 1.0 + 9.0 * fil_plus_rate
-    # qa_factor = compute_qa_factor(fil_plus_rate, fil_plus_m, duration_m, duration)
-    # qa_onboard_power = qa_factor * rb_onboard_power
     filplus_rbp = rb_onboard_power * fil_plus_rate
     notfilplus_rbp = rb_onboard_power * (1-fil_plus_rate)  # includes CC and regular deal, which both get SDM
 
+    if filp_multiplier_fn is not None and filp_multiplier_fn_kwargs is not None:
+        additional_filp_multiplier_val = filp_multiplier_fn(**filp_multiplier_fn_kwargs)
+    else:
+        additional_filp_multiplier_val = 1
+    if cc_multiplier_fn is not None and cc_multiplier_fn_kwargs is not None:
+        additional_cc_multiplier_val = cc_multiplier_fn(**cc_multiplier_fn_kwargs)
+    else:
+        additional_cc_multiplier_val = 1
+
     # filplus_factor_with_duration = fil_plus_m if duration_m is None else fil_plus_m * duration_m(duration)
-    filplus_factor_vec = np.ones(forecast_lenght) * fil_plus_m
-    if sdm_onboard_before_intervention:
-        filplus_factor_vec[0:intervention_day] *= duration_m(duration)
-    if sdm_onboard_after_intervention:
-        filplus_factor_vec[intervention_day:] *= duration_m(duration)
+    filplus_factor_vec = np.ones(forecast_length) * fil_plus_m
+    if update_onboard_power_multiplier_before_intervention:
+        filplus_factor_vec[0:intervention_day] *= additional_filp_multiplier_val
+    if update_onboard_power_multiplier_after_intervention:
+        filplus_factor_vec[intervention_day:] *= additional_filp_multiplier_val
     filplus_qap = filplus_rbp * filplus_factor_vec
 
-    rbp_factor = 1 if duration_m is None else duration_m(duration)
     # convert it to a vector to handle when durations happen and when they do not
-    rbp_factor_vec = np.ones(forecast_lenght)
-    if sdm_onboard_before_intervention:
-        rbp_factor_vec[0:intervention_day] = rbp_factor
-    if sdm_onboard_after_intervention:
-        rbp_factor_vec[intervention_day:] = rbp_factor
+    rbp_factor_vec = np.ones(forecast_length)
+    if update_onboard_power_multiplier_before_intervention:
+        rbp_factor_vec[0:intervention_day] = additional_cc_multiplier_val
+    if update_onboard_power_multiplier_after_intervention:
+        rbp_factor_vec[intervention_day:] = additional_cc_multiplier_val
     notfilplus_qap = notfilplus_rbp * rbp_factor_vec
 
     qa_onboard_power = filplus_qap + notfilplus_qap
     
     qa_onboard_power_vec = scalar_or_vector_to_vector(
         qa_onboard_power,
-        forecast_lenght,
+        forecast_length,
         err_msg="If qa_onboard_power is provided as a vector, it must be the same length as the forecast length",
     )
     return qa_onboard_power_vec
@@ -117,53 +108,53 @@ def compute_day_qa_renewed_power(
     renewal_rate_vec: np.array,
     fil_plus_rate: float,
     fil_plus_m: float = 10.0,
-    duration_m: Callable = None,
-    duration: int = None,
+    cc_multiplier_fn=None,
+    cc_multiplier_fn_kwargs=None,
+    filp_multiplier_fn=None,
+    filp_multiplier_fn_kwargs=None,
     intervention_day: int = None,
-    sdm_renew_before_intervention: bool = False,
-    sdm_renew_after_intervention: bool = True
+    update_renew_power_multiplier_before_intervention: bool = False,
+    update_renew_power_multiplier_after_intervention: bool = True
 ) -> float:
     fpr = (
         fil_plus_rate
         if isinstance(fil_plus_rate, numbers.Number)
         else fil_plus_rate[day_i]
     )
-    # qa_factor = compute_qa_factor(fpr, fil_plus_m, duration_m, duration)
-    # day_renewed_power = (
-    #     qa_factor * renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
-    # )
-    # return day_renewed_power
 
     rb_power_to_renew = renewal_rate_vec[day_i] * day_rb_scheduled_expire_power_vec[day_i]
     filplus_renew = rb_power_to_renew * fpr
     notfilplus_renew = rb_power_to_renew * (1-fpr)  # includes CC and regular deal, which both get SDM
 
-    filplus_factor_with_duration = fil_plus_m if duration_m is None else fil_plus_m * duration_m(duration)
+    total_filp_multiplier = fil_plus_m
+    if filp_multiplier_fn is not None and filp_multiplier_fn_kwargs is not None:
+        total_filp_multiplier *= filp_multiplier_fn(**filp_multiplier_fn_kwargs)
+
     if day_i < intervention_day:
-        if not sdm_renew_before_intervention:
+        if not update_renew_power_multiplier_before_intervention:
             filplus_factor = fil_plus_m
         else:
-            filplus_factor = filplus_factor_with_duration
+            filplus_factor = total_filp_multiplier
     if day_i >= intervention_day:
-        if not sdm_renew_after_intervention:
+        if not update_renew_power_multiplier_after_intervention:
             filplus_factor = fil_plus_m
         else:
-            filplus_factor = filplus_factor_with_duration
-    # filplus_factor = 10
+            filplus_factor = total_filp_multiplier
     filplus_qap = filplus_renew * filplus_factor
 
-    rbp_factor_with_duration = 1 if duration_m is None else duration_m(duration)
+    total_rbp_multiplier = 1 #if duration_m is None else duration_m(duration)
+    if cc_multiplier_fn is not None and cc_multiplier_fn_kwargs is not None:
+        total_rbp_multiplier *= cc_multiplier_fn(**cc_multiplier_fn_kwargs)
     if day_i < intervention_day:
-        if not sdm_renew_before_intervention:
+        if not update_renew_power_multiplier_before_intervention:
             rbp_factor = 1
         else:
-            rbp_factor = rbp_factor_with_duration
+            rbp_factor = total_rbp_multiplier
     if day_i >= intervention_day:
-        if not sdm_renew_after_intervention:
+        if not update_renew_power_multiplier_after_intervention:
             rbp_factor = 1
         else:
-            rbp_factor = rbp_factor_with_duration
-    # rbp_factor = 1
+            rbp_factor = total_rbp_multiplier
     notfilplus_qap = notfilplus_renew * rbp_factor
 
     day_renewed_power = filplus_qap + notfilplus_qap
@@ -212,8 +203,11 @@ def forecast_power_stats(
     duration: int,
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
-    duration_m: Callable = None,
-    qap_method: str = 'basic',  # can be set to tunable or basic
+    cc_multiplier_fn: Callable = None,
+    cc_multiplier_fn_kwargs: dict = {},
+    filp_multiplier_fn: Callable = None,
+    filp_multiplier_fn_kwargs: dict = {},
+    qap_method: str = 'basic',  # can be set to tunable, basic, or sdm-basic
                                   # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
     intervention_config: dict = None,
     fpr_hist_info: tuple = None,
@@ -221,30 +215,29 @@ def forecast_power_stats(
     validate_qap_method(qap_method)
 
     if fpr_hist_info is None:
-        #t_fpr_hist, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
-        #_, fpr_hist = u.get_historical_filplus_rate(datetime.date(2021,3,15), datetime.date(2022,12,1))
         raise ValueError('fpr_hist_info must be provided')
-    else:
-        t_fpr_hist = fpr_hist_info[0]  # unused but keeping for interface
-        fpr_hist = fpr_hist_info[1]
+    t_fpr_hist = fpr_hist_info[0]  # unused but keeping for interface
+    fpr_hist = fpr_hist_info[1]
     fpr_all = np.concatenate([fpr_hist, fil_plus_rate])
     fpr_all_simindex_start = len(fpr_hist)
     
-    if intervention_config is not None:
-        intervention_type = intervention_config['type']
-        num_days_shock_behavior = intervention_config.get('num_days_shock_behavior', 360) 
-        cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 1)
+    if intervention_config is None:
+        raise Exception("An intervention configuration must be provided in this branch, since this is a non-standard use of mechaFIL!")
 
-        intervention_date = intervention_config['intervention_date']
-        sim_start_date = intervention_config['simulation_start_date']
-        upgrade_day = (intervention_date - sim_start_date).days
-        sdm_onboard_before_intervention = intervention_config.get('sdm_onboard_before_intervention', False)
-        sdm_onboard_after_intervention = intervention_config.get('sdm_onboard_after_intervention', True)
-        sdm_renew_before_intervention = intervention_config.get('sdm_renew_before_intervention', False)
-        sdm_renew_after_intervention = intervention_config.get('sdm_renew_after_intervention', True)
-    else:
-        raise Exception("TODO")
+    intervention_type = intervention_config['type']
+    num_days_shock_behavior = intervention_config.get('num_days_shock_behavior', 360) 
+    cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 1)
 
+    intervention_date = intervention_config['intervention_date']
+    sim_start_date = intervention_config['simulation_start_date']
+    upgrade_day = (intervention_date - sim_start_date).days
+    
+    # the default setting here applies the multiplier updates only after intervention
+    update_onboard_power_multiplier_before_intervention = intervention_config.get('update_onboard_power_multiplier_before_intervention', False)
+    update_onboard_power_multiplier_after_intervention = intervention_config.get('update_onboard_power_multiplier_after_intervention', True)
+    update_renew_power_multiplier_before_intervention = intervention_config.get('update_renew_power_multiplier_before_intervention', False)
+    update_renew_power_multiplier_after_intervention = intervention_config.get('update_renew_power_multiplier_after_intervention', True)
+    
     # Forecast onboards
     renewal_rate_vec = scalar_or_vector_to_vector(
         renewal_rate,
@@ -302,12 +295,6 @@ def forecast_power_stats(
         cc_future_expire_renewed_vec[jj] = cc_future_expire_vec[jj] * rr_jj
         fpr_future_expire_renewed_vec[jj] = fpr_future_expire_vec[jj] * rr_jj
         cc_future_expire_power_to_transfer_total += cc_future_expire_renewed_vec[jj]
-
-    # print('cc future expire', np.sum(cc_future_expire_vec))
-    # print('fpr future expire', np.sum(fpr_future_expire_vec))
-    # print('[window] cc to expire that will be transferred', cc_future_expire_power_to_transfer_total, 
-    #        np.sum(cc_future_expire_renewed_vec))
-    # print('[window] fpr to expire that will be renewed', np.sum(fpr_future_expire_renewed_vec))
     ########################################################################################################################
     
     day_qa_onboarded_power = forecast_qa_daily_onboardings(
@@ -315,11 +302,13 @@ def forecast_power_stats(
         fil_plus_rate,
         forecast_lenght,
         fil_plus_m,
-        duration_m,
-        duration,
+        cc_multiplier_fn=cc_multiplier_fn,
+        cc_multiplier_fn_kwargs=cc_multiplier_fn_kwargs,
+        filp_multiplier_fn=filp_multiplier_fn,
+        filp_multiplier_fn_kwargs=filp_multiplier_fn_kwargs,
         intervention_day=upgrade_day,
-        sdm_onboard_before_intervention=sdm_onboard_before_intervention,
-        sdm_onboard_after_intervention=sdm_onboard_after_intervention,
+        update_onboard_power_multiplier_before_intervention=update_onboard_power_multiplier_before_intervention,
+        update_onboard_power_multiplier_after_intervention=update_onboard_power_multiplier_after_intervention,
     )
     # Initialize scheduled expirations and renewals
     day_rb_scheduled_expire_power = np.zeros(forecast_lenght)
@@ -339,7 +328,9 @@ def forecast_power_stats(
             rbp_to_reonboard = cc_future_expire_power_to_transfer_total/cc_reonboard_time_days
             # add to whatever was already scheduled to be onboarded
             day_rb_onboarded_power[day_i] += rbp_to_reonboard
-            day_qa_onboarded_power[day_i] += (rbp_to_reonboard * duration_m(duration))  # get SDM when re-onboarding the CC sectors
+
+            additional_rb_multiplier = cc_multiplier_fn(**cc_multiplier_fn_kwargs) if cc_multiplier_fn is not None else 1
+            day_qa_onboarded_power[day_i] += (rbp_to_reonboard * additional_rb_multiplier)  # get SDM when re-onboarding the CC sectors
 
         # Raw-power stats
         rb_sched_expire_pwr_i, known_rb_se_power_i, model_rb_se_power_i = compute_day_se_power(
@@ -389,6 +380,7 @@ def forecast_power_stats(
 
         # see https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view for more details
         if qap_method == 'tunable':
+            # this mode is designed for the case where RBP and QAP have independent additional multipliers
             if (intervention_type == 'cc_early_renewal' or intervention_type == 'cc_early_terminate_and_onboard') and day_i in shock_days_vec:
                 temp_fpr = 1
                 # since we moved the RBP power out of the expirations for this time period [intervention, intervention+num_days_shock_behavior]
@@ -400,11 +392,13 @@ def forecast_power_stats(
                     renewal_rate_vec,
                     temp_fpr,
                     fil_plus_m,
-                    duration_m,
-                    duration,
+                    cc_multiplier_fn=cc_multiplier_fn,
+                    cc_multiplier_fn_kwargs=cc_multiplier_fn_kwargs,
+                    filp_multiplier_fn=filp_multiplier_fn,
+                    filp_multiplier_fn_kwargs=filp_multiplier_fn_kwargs,
                     intervention_day=upgrade_day,
-                    sdm_renew_before_intervention=sdm_renew_before_intervention,
-                    sdm_renew_after_intervention=sdm_renew_after_intervention
+                    update_renew_power_multiplier_before_intervention=update_renew_power_multiplier_before_intervention,
+                    update_renew_power_multiplier_after_intervention=update_renew_power_multiplier_after_intervention
                 )
             else:
                 day_qa_renewed_power[day_i] = compute_day_qa_renewed_power(
@@ -413,34 +407,36 @@ def forecast_power_stats(
                     renewal_rate_vec,
                     fil_plus_rate,
                     fil_plus_m,
-                    duration_m,
-                    duration,
+                    cc_multiplier_fn=cc_multiplier_fn,
+                    cc_multiplier_fn_kwargs=cc_multiplier_fn_kwargs,
+                    filp_multiplier_fn=filp_multiplier_fn,
+                    filp_multiplier_fn_kwargs=filp_multiplier_fn_kwargs,
                     intervention_day=upgrade_day,
-                    sdm_renew_before_intervention=sdm_renew_before_intervention,
-                    sdm_renew_after_intervention=sdm_renew_after_intervention
+                    update_renew_power_multiplier_before_intervention=update_renew_power_multiplier_before_intervention,
+                    update_renew_power_multiplier_after_intervention=update_renew_power_multiplier_after_intervention
                 )
         elif qap_method == 'basic':
             day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
                 day_i, day_qa_scheduled_expire_power, renewal_rate_vec
             )
         elif qap_method == 'basic-sdm':
+            # this mode wors for SDM + no additional multiplier best
             day_qa_renewed_power[day_i] = compute_basic_day_renewed_power(
                 day_i, day_qa_scheduled_expire_power, renewal_rate_vec
             )
-            sdm_factor_with_duration = 1 if duration_m is None else duration_m(duration)
             if day_i < upgrade_day:
-                if not sdm_renew_before_intervention:
-                    sdm_factor = 1
+                if not update_renew_power_multiplier_before_intervention:
+                    additional_qa_multiplier = 1
                 else:
-                    sdm_factor = sdm_factor_with_duration
+                    additional_qa_multiplier = filp_multiplier_fn(**filp_multiplier_fn_kwargs)
             if day_i >= upgrade_day:
-                if not sdm_renew_after_intervention:
-                    sdm_factor = 1
+                if not update_renew_power_multiplier_after_intervention:
+                    additional_qa_multiplier = 1
                 else:
-                    sdm_factor = sdm_factor_with_duration
-            day_qa_renewed_power[day_i] *= sdm_factor
+                    additional_qa_multiplier = filp_multiplier_fn(**filp_multiplier_fn_kwargs)
+            day_qa_renewed_power[day_i] *= additional_qa_multiplier
             if (intervention_type == 'cc_early_renewal' or intervention_type == 'cc_early_terminate_and_onboard') and day_i in shock_days_vec:
-                day_qa_renewed_power[day_i] = fpr_future_expire_renewed_vec[day_i-upgrade_day] * duration_m(duration)
+                day_qa_renewed_power[day_i] = fpr_future_expire_renewed_vec[day_i-upgrade_day] * filp_multiplier_fn(**filp_multiplier_fn_kwargs)
 
         if intervention_type == 'cc_early_renewal' and day_i == upgrade_day:
             #   add the same power into the renewed power
@@ -453,7 +449,8 @@ def forecast_power_stats(
             
             # renew
             day_rb_renewed_power[day_i] += cc_future_expire_power_to_transfer_total
-            day_qa_renewed_power[day_i] += duration_m(duration)*cc_future_expire_power_to_transfer_total  # gets SDM when renewed
+            additional_rb_multiplier = cc_multiplier_fn(**cc_multiplier_fn_kwargs) if cc_multiplier_fn is not None else 1
+            day_qa_renewed_power[day_i] += additional_rb_multiplier*cc_future_expire_power_to_transfer_total  # gets SDM when renewed
 
     # compute total powers
     total_rb_onboarded_power = day_rb_onboarded_power.cumsum()
