@@ -6,13 +6,11 @@ from typing import Tuple, List
 import os
 import json
 
-from .data import NETWORK_START
-
-EXBI = 2**60
-PIB = 2**50
-
 DEFAULT_SPACESCOPE_CHUNK_SIZE_IN_DAYS = 90
 DEFAULT_AUTH_CONFIG = os.path.join(os.path.dirname(__file__), 'cfg', 'spacescope_auth.json')
+
+from .data import NETWORK_START
+from .constants import EXBI, PIB
 
 class SpacescopeDataConnection:
     auth_token = ""

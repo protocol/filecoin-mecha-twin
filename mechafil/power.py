@@ -213,7 +213,7 @@ def forecast_power_stats(
     forecast_lenght: int,
     fil_plus_m: float = 10.0,
     duration_m: Callable = None,
-    qap_method: str = 'tunable',  # can be set to tunable or basic
+    qap_method: str = 'basic',  # can be set to tunable or basic
                                   # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
     intervention_config: dict = None,
     fpr_hist_info: tuple = None,

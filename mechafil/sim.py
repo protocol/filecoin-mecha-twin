@@ -1,9 +1,11 @@
+import os
+
 import pandas as pd
 import numpy as np
 import datetime
 from typing import Union
 
-from .data import get_historical_network_stats, get_sector_expiration_stats
+from .data import get_historical_network_stats, get_sector_expiration_statsi, setup_spacescope
 from .power import (
     forecast_power_stats,
     build_full_power_stats_df,
@@ -15,6 +17,14 @@ from .supply import forecast_circulating_supply_df
 
 from .utils import validate_qap_method
 
+def setup_data_access(bearer_token_or_cfg: str):
+    setup_spacescope(bearer_token_or_cfg)
+
+def validate_current_date(current_date: datetime.date):
+    if current_date > (datetime.date.today() - datetime.timedelta(days=2)):
+        raise ValueError("Current date must be at least 2 days in the past!")
+
+
 def run_simple_sim(
     start_date: datetime.date,
     current_date: datetime.date,
@@ -23,10 +33,13 @@ def run_simple_sim(
     rb_onboard_power: Union[np.array, float],
     fil_plus_rate: Union[np.array, float],
     duration: int,
-    qap_method: str = 'tunable' # can be set to tunable or basic
-                                # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    bearer_token_or_cfg: str,
+    qap_method: str = 'basic' # can be set to tunable or basic
+                              # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
 ) -> pd.DataFrame:
     validate_qap_method(qap_method)
+    setup_data_access(bearer_token_or_cfg)
+    validate_current_date(current_date)
 
     end_date = current_date + datetime.timedelta(days=forecast_length)
     # Get sector scheduled expirations
@@ -86,7 +99,7 @@ def run_simple_sim(
     forecast_renewal_rate_vec = scalar_or_vector_to_vector(
         renewal_rate, forecast_length
     )
-    past_renewal_rate_vec = fil_stats_df["rb_renewal_rate"].values
+    past_renewal_rate_vec = fil_stats_df["rb_renewal_rate"].values[:-1]
     renewal_rate_vec = np.concatenate(
         [past_renewal_rate_vec, forecast_renewal_rate_vec]
     )
