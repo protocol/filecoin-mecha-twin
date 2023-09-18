@@ -227,6 +227,7 @@ def forecast_power_stats(
     intervention_type = intervention_config['type']
     num_days_shock_behavior = intervention_config.get('num_days_shock_behavior', 360) 
     cc_reonboard_time_days = intervention_config.get('cc_reonboard_time_days', 1)
+    cc_reonboard_delay_days = intervention_config.get('cc_reonboard_delay_days', 0)
 
     intervention_date = intervention_config['intervention_date']
     sim_start_date = intervention_config['simulation_start_date']
@@ -250,7 +251,7 @@ def forecast_power_stats(
     )
 
     shock_days_vec = [upgrade_day + k for k in range(num_days_shock_behavior)]
-    reonboard_days_vec = [upgrade_day + k for k in range(cc_reonboard_time_days)]
+    reonboard_days_vec = [upgrade_day + cc_reonboard_delay_days + k for k in range(cc_reonboard_time_days)]
     # inputs are RenewalRate, RB Onboarding, and FIL+ rate.  
     # Setup the time indices for each to align the times when arrays are sliced.
     t_input_vec = np.asarray([sim_start_date + datetime.timedelta(days=x) for x in range(forecast_lenght)])
@@ -262,9 +263,9 @@ def forecast_power_stats(
     # To do so, we run the simulation loop to determine how many modeled sectors would expire during that time-period
     #  we then back that power out of those times into the intervention day.  This is notably messy, but was the quickest
     #  way to simulate the effect we needed.  We can clean this up later.
+    tmp_duration = duration
     day_rb_scheduled_expire_power_tmp = np.zeros(forecast_lenght)
     day_rb_renewed_power_tmp = np.zeros(forecast_lenght)
-    tmp_duration = 365
     for day_i in range(forecast_lenght):  # don't need to run the whole len
         rb_sched_expire_pwr_i, known_rb_se_power_i, model_rb_se_power_i = compute_day_se_power(
             day_i,
