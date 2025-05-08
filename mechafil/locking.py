@@ -21,7 +21,8 @@ def compute_day_delta_pledge(
     baseline_power: float,
     renewal_rate: float,
     scheduled_pledge_release: float,
-    lock_target: float = 0.3,
+    lock_target: float,
+    gamma: float
 ) -> float:
     onboards_delta = compute_new_pledge_for_added_power(
         day_network_reward,
@@ -30,6 +31,7 @@ def compute_day_delta_pledge(
         total_qa_power,
         baseline_power,
         lock_target,
+        gamma
     )
     renews_delta = compute_renewals_delta_pledge(
         day_network_reward,
@@ -40,6 +42,7 @@ def compute_day_delta_pledge(
         renewal_rate,
         scheduled_pledge_release,
         lock_target,
+        gamma
     )
     return onboards_delta + renews_delta
 
@@ -53,7 +56,8 @@ def compute_day_locked_pledge(
     baseline_power: float,
     renewal_rate: float,
     scheduled_pledge_release: float,
-    lock_target: float = 0.3,
+    lock_target,
+    gamma: float
 ) -> float:
     # Total locked from new onboards
     onboards_locked = compute_new_pledge_for_added_power(
@@ -63,6 +67,7 @@ def compute_day_locked_pledge(
         total_qa_power,
         baseline_power,
         lock_target,
+        gamma
     )
     # Total locked from renewals
     original_pledge = renewal_rate * scheduled_pledge_release
@@ -73,6 +78,7 @@ def compute_day_locked_pledge(
         total_qa_power,
         baseline_power,
         lock_target,
+        gamma
     )
     renews_locked = max(original_pledge, new_pledge)
     # Total locked pledge
@@ -89,6 +95,7 @@ def compute_renewals_delta_pledge(
     renewal_rate: float,
     scheduled_pledge_release: float,
     lock_target: float,
+    gamma
 ) -> float:
     # Delta from sectors expiring
     expire_delta = -(1 - renewal_rate) * scheduled_pledge_release
@@ -101,6 +108,7 @@ def compute_renewals_delta_pledge(
         total_qa_power,
         baseline_power,
         lock_target,
+        gamma
     )
     renew_delta = max(0.0, new_pledge - original_pledge)
     # Delta for all scheduled sectors
@@ -115,12 +123,23 @@ def compute_new_pledge_for_added_power(
     total_qa_power: float,
     baseline_power: float,
     lock_target: float,
+    gamma
 ) -> float:
     # storage collateral
     storage_pledge = 20.0 * day_network_reward * (day_added_qa_power / total_qa_power)
     # consensus collateral
     normalized_qap_growth = day_added_qa_power / max(total_qa_power, baseline_power)
     consensus_pledge = max(lock_target * prev_circ_supply * normalized_qap_growth, 0)
+
+    # compute simple and baseline pledge 
+    simple_consensus_pledge = lock_target * prev_circ_supply * (day_added_qa_power/total_qa_power)
+    simple_consensus_pledge = np.maximum(simple_consensus_pledge, 0)
+
+    baseline_consensus_pledge = lock_target * prev_circ_supply * normalized_qap_growth
+    baseline_consensus_pledge = np.maximum(baseline_consensus_pledge, 0)
+
+    consensus_pledge = (1-gamma) * simple_consensus_pledge + gamma * baseline_consensus_pledge
+
     # total added pledge
     added_pledge = storage_pledge + consensus_pledge
 
