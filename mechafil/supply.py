@@ -13,6 +13,8 @@ from .locking import (
 from .power import scalar_or_vector_to_vector
 from .data import NETWORK_START
 
+from numpy.typing import NDArray
+
 """
 There is still a small discrepancy between the actual locked FIL and forecasted
 locked FIL. We believe that it could be due to the following reasons:
@@ -35,7 +37,8 @@ def forecast_circulating_supply_df(
     vest_df: pd.DataFrame,
     mint_df: pd.DataFrame,
     known_scheduled_pledge_release_vec: np.array,
-    lock_target: float = 0.3,
+    lock_target, 
+    gamma: Union[np.array, NDArray]
 ) -> pd.DataFrame:
     # we assume all stats started at main net launch, in 2020-10-15
     start_day = (start_date - NETWORK_START.date()).days
@@ -54,6 +57,10 @@ def forecast_circulating_supply_df(
     circ_supply = circ_supply_zero
     sim_len = end_day - start_day
     renewal_rate_vec = scalar_or_vector_to_vector(renewal_rate, sim_len)
+    gamma_converge = 0.7
+
+    #Note, this needs to be done because sim_len and forecast_length are different
+    gamma = np.concatenate([gamma, np.full(sim_len - len(gamma), gamma_converge)]) if len(gamma) < sim_len else gamma
 
     # Simulation for loop
     current_day_idx = current_day - start_day
@@ -77,6 +84,7 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target,
+            gamma[day_idx]
         )
         # Get total locked pledge (needed for future day_locked_pledge)
         day_locked_pledge, day_renewed_pledge = compute_day_locked_pledge(
@@ -89,6 +97,7 @@ def forecast_circulating_supply_df(
             renewal_rate_vec[day_idx],
             scheduled_pledge_release,
             lock_target,
+            gamma[day_idx]
         )
         # Compute daily change in block rewards collateral
         day_locked_rewards = compute_day_locked_rewards(

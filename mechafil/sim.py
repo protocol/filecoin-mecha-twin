@@ -24,6 +24,20 @@ def validate_current_date(current_date: datetime.date):
     if current_date > (datetime.date.today() - datetime.timedelta(days=2)):
         raise ValueError("Current date must be at least 2 days in the past!")
 
+def create_gamma_trajectory(current_date, forecast_length_days, fip81_activation_date, ramp_len_days=365): 
+    gamma_target = 0.7
+    days_since_activation = (current_date - fip81_activation_date).days
+    gamma_slope = (1.0 - gamma_target) / ramp_len_days
+    current_gamma = 1.0 - gamma_slope * days_since_activation
+    print(f'current_gamma: {current_gamma}')
+    remaining_days = ramp_len_days - days_since_activation
+    v1 = np.linspace(current_gamma, gamma_target, remaining_days)
+    v2 = np.ones(forecast_length_days - remaining_days) * gamma_target
+    gamma_trajectory = np.concatenate([v1, v2])
+    #print(gamma_trajectory)
+
+    return gamma_trajectory
+
 def run_simple_sim(
     start_date: datetime.date,
     current_date: datetime.date,
@@ -33,8 +47,8 @@ def run_simple_sim(
     fil_plus_rate: Union[np.array, float],
     duration: int,
     bearer_token_or_cfg: str,
-    qap_method: str = 'basic' # can be set to tunable or basic
-                              # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view
+    qap_method: str = 'basic', # can be set to tunable or basic
+                              # see: https://hackmd.io/O6HmAb--SgmxkjLWSpbN_A?view                         
 ) -> pd.DataFrame:
     validate_qap_method(qap_method)
     setup_data_access(bearer_token_or_cfg)
@@ -102,6 +116,16 @@ def run_simple_sim(
     renewal_rate_vec = np.concatenate(
         [past_renewal_rate_vec, forecast_renewal_rate_vec]
     )
+
+    #create gamma vector for FIP0081
+    fip81_activation_date = datetime.date(2024, 11, 21)
+    sim_len = end_date - start_date
+    gamma_smooth_1y = create_gamma_trajectory(start_date, forecast_length, fip81_activation_date, ramp_len_days=365)
+
+    print(gamma_smooth_1y)
+    #print("forecast length is" + str(forecast_length))
+    #Non Configurable Lock_Target for now 
+    lock_target = 0.3
     cil_df = forecast_circulating_supply_df(
         start_date,
         current_date,
@@ -115,5 +139,7 @@ def run_simple_sim(
         vest_df,
         mint_df,
         known_scheduled_pledge_release_full_vec,
+        lock_target,
+        gamma_smooth_1y
     )
     return cil_df
