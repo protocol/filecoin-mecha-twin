@@ -46,7 +46,7 @@ python setup.py install
 2. Store your token in a json configuration file with the key `auth_key`.  An example is:
 ```json
 {
-    "auth_key": "Bearer ghp_xJtTSVcNRJINLWMmfDangcIFCjqPUNZenoVe"
+    "auth_key": "Bearer <YOUR_API_TOKEN>"
 }
 ```
 
