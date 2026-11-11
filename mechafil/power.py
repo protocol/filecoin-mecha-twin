@@ -306,8 +306,6 @@ def build_full_power_stats_df(
         {"date": pd.date_range(start=start_date, end=end_date, freq="d")}
     )
     power_df["date"] = power_df["date"].dt.date
-    power_df = power_df.merge(concat_df, on="date", how="left").fillna(
-        method="backfill"
-    )
+    power_df = power_df.merge(concat_df, on="date", how="left").bfill()
     power_df = power_df.iloc[:-1]
     return power_df
