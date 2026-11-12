@@ -16,8 +16,8 @@ setuptools.setup(
         "Source": "https://github.com/protocol/filecoin-mecha-twin",
     },
     packages=["mechafil"],
-    install_requires=["numpy>=1.22", "pandas>=1.4", "requests>=2.28"],
-    python_requires=">=3.8",
+    install_requires=["numpy>=2", "pandas>=3", "requests>=2.28"],
+    python_requires=">=3.11",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

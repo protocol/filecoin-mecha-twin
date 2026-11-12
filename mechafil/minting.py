@@ -65,7 +65,7 @@ def compute_minting_trajectory_df(
     df["cum_baseline_reward"] = df["network_time"].pipe(cum_baseline_reward)
     # Add cumulative rewards and get daily rewards minted
     df["cum_network_reward"] = df["cum_baseline_reward"] + df["cum_simple_reward"]
-    df["day_network_reward"] = df["cum_network_reward"].diff().fillna(method="backfill")
+    df["day_network_reward"] = df["cum_network_reward"].diff().bfill()
 
     return df
 
